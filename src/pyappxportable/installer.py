@@ -2,12 +2,14 @@
 
 import os
 import platform
+import shutil
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from pyappxportable.components import install_component_projections
 from pyappxportable.console import (
     Ask,
     choose,
@@ -37,7 +39,11 @@ from pyappxportable.launchers import (
     plays_media,
     write_launcher,
 )
-from pyappxportable.macos import add_macos_dependencies, install_managed_wine
+from pyappxportable.macos import (
+    WINE_DEVEL_APP,
+    add_macos_dependencies,
+    install_managed_wine,
+)
 from pyappxportable.manifest import Manifest, read_manifest
 from pyappxportable.options import InstallOptions
 from pyappxportable.patches import KNOWN_PATCHES, apply_known_patch
@@ -376,6 +382,18 @@ def install_or_update(  # pylint: disable=too-many-locals
         and tag
     ):
         managed_wine = install_managed_wine(tag)
+    if sys.platform == "darwin":
+        add_macos_dependencies(args, ask, wine_ready=managed_wine is not None)
+    if managed and sys.platform != "win32":
+        selected_wine = os.environ.get("WINE") or managed_wine or shutil.which("wine")
+        if selected_wine is None and sys.platform == "darwin":
+            selected_wine = WINE_DEVEL_APP / "Contents/Resources/wine/bin/wine"
+        install_component_projections(
+            destination,
+            Path(selected_wine) if selected_wine else None,
+            tag=tag,
+            build=absolute(args.build) if args.build else None,
+        )
     if launcher:
         launch = str(
             write_launcher(
@@ -387,8 +405,6 @@ def install_or_update(  # pylint: disable=too-many-locals
                 wine_runtime=managed_wine,
             )
         )
-    if sys.platform == "darwin":
-        add_macos_dependencies(args, ask, wine_ready=managed_wine is not None)
     if managed and sys.platform != "win32":
         warn(
             "managed (.NET) games still need the WinRT projection and XAML engine;"
