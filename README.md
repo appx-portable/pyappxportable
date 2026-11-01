@@ -1,0 +1,90 @@
+# pyappxportable
+
+Install Windows Store games as ordinary portable desktop games using [Appx Portable](https://github.com/yell0wsuit/appx-portable).
+
+Give the installer an `.appxbundle`, `.appx`, or extracted package folder. It extracts the game, downloads the matching Appx Portable runtime and required Microsoft framework packages, applies supported game patches, and writes a `00_click2startme` launcher. Updates preserve saves, settings, and logs.
+
+This package contains no games or Microsoft runtime files. Supply your own game packages. Runtime DLLs and game patches come from `yell0wsuit/appx-portable`; framework packages come from `yell0wsuit/vclibs-appx` with pinned SHA-256 checks.
+
+## Install
+
+Requires **Python 3.8 or later**, with pip. Use a Python release compatible with your Windows version; managed XAML games need Windows 10 1903 or later and .NET Framework 4.x. macOS/Wine support is experimental; managed games and games that require the native host need Windows.
+
+```sh
+python -m pip install pyappxportable
+pyappxportable "C:\Downloads\Game.appxbundle"
+```
+
+On Windows, `py -m pip` and `py -m pyappxportable` also work. On macOS/Linux, use `python3` if that is your Python command. With a Python installation managed by your OS, install into a virtual environment or use `pipx install pyappxportable`.
+
+Run `pyappxportable` without arguments for prompts. If the command is not on your PATH, use `python -m pyappxportable`. After installation, double-click `00_click2startme.bat` on Windows or `00_click2startme.command` on macOS. Linux uses `00_click2startme.sh` with Wine.
+
+## Command-line options
+
+```sh
+pyappxportable Game.appx --dest Games/Game --store none --launcher --yes
+python -m pyappxportable --help
+```
+
+| Option                           | Purpose                                                         |
+| -------------------------------- | --------------------------------------------------------------- |
+| `--dest FOLDER`                  | Destination; defaults beside the source, using its package name |
+| `--dependencies PATH`            | VCLibs or .NET Native package/folder; repeat for several        |
+| `--build FOLDER`                 | Use locally built runtime DLLs                                  |
+| `--release TAG`                  | Select a runtime release instead of the latest                  |
+| `--store none\|trial\|iap\|both` | Store overrides; omitted with `--yes` preserves settings        |
+| `--launcher`, `--no-launcher`    | Create or skip the launcher; defaults to creating it            |
+| `--no-patch`                     | Skip known-game patches                                         |
+| `--patch-dir FOLDER`             | Use a local Appx Portable `patch/` folder                       |
+| `--desktop-copy`                 | Make a Windows 8/8.1 desktop executable copy on any Windows     |
+| `--yes`                          | Disable prompts; fail if a required input is missing            |
+
+For a local runtime checkout:
+
+```sh
+pyappxportable Game.appx --build ../appx-portable/build/windows-x86 --patch-dir ../appx-portable/patch
+```
+
+Choose an x64 build for an x64 game. Without `--patch-dir`, known-game patches are downloaded at the selected runtime release tag, including with `--build`.
+
+Upgrade the installer with `python -m pip install --upgrade pyappxportable`. Run it again with the original package and the same `--dest` to update a game. The Python package version and the runtime release version are independent.
+
+On macOS, the installer can set up Wine Devel, Rosetta 2, and GStreamer. Rosetta and GStreamer require administrator authorization; `--yes` prints instructions for those steps. See the [installer guide](https://github.com/yell0wsuit/appx-portable/blob/main/docs/installer.md) and [game compatibility](https://github.com/yell0wsuit/appx-portable/blob/main/docs/compatibility.md).
+
+## Python API
+
+```python
+from pyappxportable import InstallError, InstallOptions, install_game
+
+try:
+    install_game(InstallOptions(
+        package="Game.appx",
+        dest="Games/Game",
+        store="none",
+    ))
+except InstallError as error:
+    print(error)
+```
+
+The API runs without prompts by default and returns `0` on success. It raises `InstallError` for actionable installation problems; filesystem errors can also raise `OSError`. Set `yes=False` to enable prompts, optionally supplying an `ask` callback to `install_game`. `Manifest` is also exported for package metadata.
+
+## Development
+
+This project uses Hatchling and a `src/pyappxportable` package with a console entry point. Modules separate manifests/extraction, PE inspection, downloads, framework dependencies, runtime staging, patches, settings, desktop copies, launchers, macOS setup, and installation orchestration.
+
+```sh
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m pylint src/pyappxportable
+python -m black --check src/pyappxportable
+python -m build
+python -m twine check dist/*
+```
+
+CI lints, builds wheel/source distributions, checks their metadata, and installs the wheel on Windows and Linux with Python 3.8, and on Windows, macOS, and Linux with the current Python. Pushes and pull requests validate the package; `v*` tags publish it to PyPI.
+
+## License
+
+[MIT](LICENSE). Extracted from `installappx.py` in Appx Portable by yell0wsuit. Games and Microsoft runtime files retain their own licenses.
