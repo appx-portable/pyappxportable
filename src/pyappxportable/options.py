@@ -23,3 +23,4 @@ class InstallOptions:  # pylint: disable=too-many-instance-attributes
     desktop_copy: bool = False
     patch_dir: Optional[str] = None
     yes: bool = True
+    check_updates: bool = True

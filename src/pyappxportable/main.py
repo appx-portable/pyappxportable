@@ -12,12 +12,22 @@ from pyappxportable.installer import install_game
 from pyappxportable.launchers import LAUNCHER
 from pyappxportable.options import InstallOptions
 from pyappxportable.settings import STORE_CHOICES
+from pyappxportable.updates import installed_version, start_update_check
 
 
 def parse_arguments(argv: List[str]):
     """The command line; every prompt has an option."""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"pyappxportable {installed_version()}"
+    )
+    parser.add_argument(
+        "--no-update-check",
+        dest="check_updates",
+        action="store_false",
+        help="skip the background package update check",
     )
     parser.add_argument(
         "package", nargs="?", help=".appxbundle, .appx, or extracted package folder"
@@ -77,7 +87,10 @@ def main(argv: Optional[List[str]] = None, ask: Callable[[str], str] = input) ->
     """Install, printing any error as one line; returns the exit code."""
     argv = sys.argv[1:] if argv is None else argv
     try:
-        return install_game(parse_arguments(argv), ask)
+        options = parse_arguments(argv)
+        if options.check_updates:
+            start_update_check()
+        return install_game(options, ask)
     except InstallError as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1

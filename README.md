@@ -28,6 +28,8 @@ python -m pyappxportable --help
 
 | Option                           | Purpose                                                         |
 | -------------------------------- | --------------------------------------------------------------- |
+| `--version` | Show the installed pyappxportable version |
+| `--no-update-check` | Skip the background PyPI update check |
 | `--dest FOLDER`                  | Destination; defaults beside the source, using its package name |
 | `--dependencies PATH`            | VCLibs or .NET Native package/folder; repeat for several        |
 | `--build FOLDER`                 | Use locally built runtime DLLs                                  |
@@ -48,6 +50,8 @@ pyappxportable Game.appx --build ../appx-portable/build/windows-x86 --patch-dir 
 Choose an x64 build for an x64 game. Without `--patch-dir`, known-game patches are downloaded at the selected runtime release tag, including with `--build`.
 
 Upgrade the installer with `python -m pip install --upgrade pyappxportable`. Run it again with the original package and the same `--dest` to update a game. The Python package version and the runtime release version are independent.
+
+The CLI checks PyPI in the background at most once a day and prints an upgrade command when a newer compatible stable release is available. Checks never install updates or delay startup; offline failures stay silent. Use `--no-update-check` or set `PYAPPXPORTABLE_NO_UPDATE_CHECK=1` to disable them. `--help`, `--version`, and Python API calls do not check for updates. Use `pyappxportable --version` to show the installed package version.
 
 On macOS, the installer can set up Wine Devel, Rosetta 2, and GStreamer. Rosetta and GStreamer require administrator authorization; `--yes` prints instructions for those steps. See the [installer guide](https://github.com/yell0wsuit/appx-portable/blob/main/docs/installer.md) and [game compatibility](https://github.com/yell0wsuit/appx-portable/blob/main/docs/compatibility.md).
 
@@ -83,7 +87,11 @@ python -m build
 python -m twine check dist/*
 ```
 
-CI lints, builds wheel/source distributions, checks their metadata, and installs the wheel on Windows and Linux with Python 3.8, and on Windows, macOS, and Linux with the current Python. Pushes and pull requests validate the package; `v*` tags publish it to PyPI.
+CI lints, runs the update/release tests, builds wheel/source distributions, checks their metadata, and installs the wheel on Windows and Linux with Python 3.8, and on Windows, macOS, and Linux with the current Python.
+
+Pushes to `main` automatically publish to PyPI and create a GitHub release when any pushed commit starts with `feat:`, `fix:`, `perf:`, or `refactor:` (including scopes such as `fix(cli):`). Any conventional commit with `!` or a `BREAKING CHANGE:` footer also releases. Documentation, test, and chore commits only validate unless they declare a breaking change. A manual workflow run on `main` always releases. Publication requires the existing PyPI Trusted Publisher for workflow `build.yaml` and GitHub environment `pypi`.
+
+Versions use the UTC date, such as `2026.11.1`, with a fourth segment for repeat releases that day (`2026.11.1.1`, `2026.11.1.2`). Existing GitHub tags, releases, and PyPI versions are checked to avoid reuse. The workflow chooses and builds the version, publishes the validated distributions, and creates the matching `v` tag and GitHub release; no manual version bump or tag push is needed. Hatch VCS derives local checkout versions from Git tags, and the published source distribution retains its release version.
 
 ## License
 

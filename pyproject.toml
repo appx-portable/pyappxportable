@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling >= 1.26"]
+requires = ["hatchling >= 1.26", "hatch-vcs >= 0.4"]
 build-backend = "hatchling.build"
 
 [project]
 name = "pyappxportable"
-version = "0.1.0"
+dynamic = ["version"]
 authors = [{ name = "yell0wsuit" }]
 description = "Install Windows Store game packages as portable Appx Portable games."
 readme = "README.md"
@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dependencies = []
+dependencies = ["packaging >= 20"]
 
 [project.optional-dependencies]
 dev = ["build", "pylint", "twine", "black"]
@@ -27,6 +27,12 @@ Runtime = "https://github.com/yell0wsuit/appx-portable"
 
 [project.scripts]
 pyappxportable = "pyappxportable.main:main"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+fallback_version = "0.1.0"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyappxportable"]
