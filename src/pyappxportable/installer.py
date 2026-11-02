@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from pyappxportable.components import install_component_projections
+from pyappxportable.components import install_managed_runtime
 from pyappxportable.console import (
     Ask,
     choose,
@@ -388,7 +388,7 @@ def install_or_update(  # pylint: disable=too-many-locals
         selected_wine = os.environ.get("WINE") or managed_wine or shutil.which("wine")
         if selected_wine is None and sys.platform == "darwin":
             selected_wine = WINE_DEVEL_APP / "Contents/Resources/wine/bin/wine"
-        install_component_projections(
+        install_managed_runtime(
             destination,
             Path(selected_wine) if selected_wine else None,
             tag=tag,
