@@ -1,7 +1,8 @@
 """Install a Windows Store game as a portable Appx Portable game folder.
 
 Accepts .appxbundle, .appx, or an extracted package folder. Run without
-arguments for interactive installation."""
+arguments for interactive installation. With --update-runtime, give an
+installed game folder to replace only its Appx Portable runtime DLLs."""
 
 import argparse
 import sys
@@ -74,6 +75,12 @@ def parse_arguments(argv: List[str]):
         "--desktop-copy",
         action="store_true",
         help="clear the AppContainer flag as Windows 8/8.1 need",
+    )
+    parser.add_argument(
+        "--update-runtime",
+        action="store_true",
+        help="replace only the Appx Portable runtime in the installed game folder"
+        " given as the package; game files, saves and settings are kept",
     )
     parser.add_argument(
         "--yes",

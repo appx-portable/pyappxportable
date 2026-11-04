@@ -39,6 +39,7 @@ python -m pyappxportable --help
 | `--no-patch`                     | Skip known-game patches                                         |
 | `--patch-dir FOLDER`             | Use a local Appx Portable `patch/` folder                       |
 | `--desktop-copy`                 | Make a Windows 8/8.1 desktop executable copy on any Windows     |
+| `--update-runtime`               | Update only the runtime DLLs of an installed game folder        |
 | `--yes`                          | Disable prompts; fail if a required input is missing            |
 
 For a local runtime checkout:
@@ -48,6 +49,16 @@ pyappxportable Game.appx --build ../appx-portable/build/windows-x86 --patch-dir 
 ```
 
 Choose an x64 build for an x64 game. Without `--patch-dir`, known-game patches are downloaded at the selected runtime release tag, including with `--build`.
+
+### Updating the runtime of an installed game
+
+To pick up a newer Appx Portable shim without the original package, point the installer at the installed game folder:
+
+```sh
+pyappxportable "C:\Games\Game" --update-runtime
+```
+
+This replaces only the shim (`appxportable.dll`), its proxy DLLs, the managed or native host the game uses, and the Wine graphics stack under Wine, using the latest release, or `--release TAG` or `--build FOLDER`. Game files, saves, `appx-portable.ini`, the launcher, and framework packages are left alone. Known-game patches are not applied again, because the game files are not re-extracted; reinstall from the package if a patched game misbehaves. Run without `--yes`, giving an installed game folder as the package offers this update instead of installing a copy. In the Python API, set `update_runtime=True` with the game folder as `package`.
 
 Upgrade the installer with `python -m pip install --upgrade pyappxportable`. Run it again with the original package and the same `--dest` to update a game. The Python package version and the runtime release version are independent.
 

@@ -10,6 +10,8 @@ class InstallOptions:  # pylint: disable=too-many-instance-attributes
 
     Paths are strings. Set yes=False and pass an ask callback to install_game
     for interactive use. A missing store value preserves existing settings.
+    With update_runtime, package is an installed game folder whose Appx
+    Portable runtime is replaced; its game files and settings are kept.
     """
 
     package: Optional[str] = None
@@ -24,3 +26,4 @@ class InstallOptions:  # pylint: disable=too-many-instance-attributes
     patch_dir: Optional[str] = None
     yes: bool = True
     check_updates: bool = True
+    update_runtime: bool = False

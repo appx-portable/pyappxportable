@@ -2,6 +2,7 @@
 
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
@@ -24,7 +25,7 @@ from pyappxportable.launchers import (
     write_launcher,
 )
 from pyappxportable.macos import add_macos_dependencies
-from pyappxportable.manifest import Manifest
+from pyappxportable.manifest import Manifest, read_manifest
 from pyappxportable.options import InstallOptions
 from pyappxportable.patches import KNOWN_PATCHES, apply_known_patch
 from pyappxportable.paths import absolute, path_warning, unquote_path
@@ -42,14 +43,21 @@ from pyappxportable.settings import read_store, write_settings
 STORE_ANSWERS = {"0": "none", "1": "trial", "2": "iap", "3": "both"}
 
 
-def choose_folders(args, ask: Callable[[str], str]) -> Tuple[Path, Path, Manifest]:
-    """The package, the folder to install it in, and the package's manifest."""
+def choose_package(args, ask: Callable[[str], str]) -> Path:
+    """The package or installed game folder, from the arguments or the prompt."""
     package = args.package
     if not package and not args.yes:
         package = ask("Game package (.appxbundle, .appx or extracted folder): ")
     if not unquote_path(package or ""):
         raise InstallError("No game package given.")
-    source = absolute(package)
+    return absolute(package)
+
+
+def choose_folders(
+    args, ask: Callable[[str], str], source: Optional[Path] = None
+) -> Tuple[Path, Path, Manifest]:
+    """The package, the folder to install it in, and the package's manifest."""
+    source = choose_package(args, ask) if source is None else source
     manifest = peek_manifest(source)
     default = source.parent / manifest.name
     if default == source:
@@ -164,30 +172,130 @@ def choose_store(args, ask: Callable[[str], str], game: Path) -> Optional[str]:
             return STORE_ANSWERS.get(answer)
 
 
-def install_game(args: InstallOptions, ask: Callable[[str], str] = input) -> int:
-    """Install the game the arguments and answers describe."""
-    source, destination, manifest = choose_folders(args, ask)
-    print(f"Installing {manifest.name} {manifest.version} into {destination}")
-    manifest = extract_game(source, destination)
-    executable = destination / manifest.executable
+@dataclass
+class Hosting:
+    """How a staged game starts, read from its executable and folder."""
+
+    architecture: str
+    managed: bool
+    native_compiled: bool
+    native_host: bool
+
+
+def game_hosting(game: Path, executable: Path) -> Hosting:
+    """The game's architecture and how it is hosted; refuses what cannot run here."""
     architecture = architecture_of(executable)
     managed = pe_info(executable).managed
     native_compiled = native_compiled_application(executable)
     # .NET Native games and native games that import no proxy (such as C++/CX
     # Unity players) start through the native host.
     native_host = native_compiled or (
-        not managed and native_host_application(destination, executable)
+        not managed and native_host_application(game, executable)
     )
     if native_host and sys.platform != "win32":
         raise InstallError("Native hosting requires Windows.")
+    return Hosting(architecture, managed, native_compiled, native_host)
+
+
+def stage_process_manifest(game: Path, executable: str, hosting: Hosting) -> None:
+    """Only XAML runs in an island, which needs the manifest; CoreWindow games do not."""
+    if hosting.native_host and not hosting.native_compiled and package_has_xaml(game):
+        warning = write_process_manifest(game, executable)
+        if warning:
+            print(f"Warning: {warning}")
+
+
+def installed_game(folder: Path) -> bool:
+    """Whether folder is a game pyappxportable installed: a staged package
+    beside the Appx Portable shim."""
+    return (folder / "AppxManifest.xml").is_file() and (
+        folder / "appxportable.dll"
+    ).is_file()
+
+
+# Options that only apply to a full installation.
+INSTALL_ONLY_OPTIONS = {
+    "dest": "--dest",
+    "dependencies": "--dependencies",
+    "store": "--store",
+    "patch_dir": "--patch-dir",
+    "desktop_copy": "--desktop-copy",
+}
+
+
+def update_runtime(args, game: Path) -> int:
+    """Replace the Appx Portable runtime of the game installed in game.
+
+    Only the shim, proxies, hosts and Wine graphics stack are staged again, from
+    --build or the release; game files, saves, settings, the launcher and
+    framework packages stay as they are."""
+    given = [
+        flag for name, flag in INSTALL_ONLY_OPTIONS.items() if getattr(args, name, None)
+    ]
+    if given:
+        raise InstallError(
+            f"{', '.join(given)} cannot be used to update the runtime; they only"
+            " apply to installing from a package."
+        )
+    if not installed_game(game):
+        raise InstallError(
+            f"{game} is not an installed game: it needs AppxManifest.xml and"
+            " appxportable.dll. Install the game from its package first."
+        )
+    manifest = read_manifest((game / "AppxManifest.xml").read_bytes())
+    executable = game / manifest.executable
+    if not executable.is_file():
+        raise InstallError(f"The game folder has no {manifest.executable}.")
+    print(
+        f"Updating the Appx Portable runtime of {manifest.name} {manifest.version}"
+        f" in {game}"
+    )
+    hosting = game_hosting(game, executable)
+    tag = stage_dlls(
+        args, game, hosting.architecture, hosting.managed, hosting.native_host
+    )
+    stage_process_manifest(game, manifest.executable, hosting)
+    if (manifest.name, manifest.version) in KNOWN_PATCHES:
+        # Patches change game files, which are not extracted again here.
+        print(
+            "Note: this game has a compatibility patch, which is not applied again."
+            " If the game misbehaves, reinstall it from its package."
+        )
+    print(
+        f"Updated the runtime{f' to {tag}' if tag else ''}. Saves and settings were kept."
+    )
+    return 0
+
+
+def offer_runtime_update(args, ask: Callable[[str], str], source: Path) -> bool:
+    """Whether to only update the runtime of an installed game given as the package."""
+    if args.yes or args.dest is not None or not installed_game(source):
+        return False
+    answer = ask(
+        f"{source} is an installed game. Update only its Appx Portable runtime? [Y/n]: "
+    )
+    return answer.strip().lower() not in ("n", "no")
+
+
+def install_game(args: InstallOptions, ask: Callable[[str], str] = input) -> int:
+    """Install the game the arguments and answers describe, or with update_runtime,
+    update the runtime of an installed game."""
+    source = choose_package(args, ask)
+    if getattr(args, "update_runtime", False) or offer_runtime_update(
+        args, ask, source
+    ):
+        return update_runtime(args, source)
+    source, destination, manifest = choose_folders(args, ask, source)
+    print(f"Installing {manifest.name} {manifest.version} into {destination}")
+    manifest = extract_game(source, destination)
+    executable = destination / manifest.executable
+    hosting = game_hosting(destination, executable)
+    architecture, managed = hosting.architecture, hosting.managed
+    native_host = hosting.native_host
     add_missing_vclibs(args, ask, manifest, destination, architecture)
     add_native_frameworks(manifest, destination, architecture, args.dependencies)
     tag = stage_dlls(args, destination, architecture, managed, native_host)
-    # Only XAML runs in an island, which needs the manifest; CoreWindow games do not.
-    if native_host and not native_compiled and package_has_xaml(destination):
-        warning = write_process_manifest(destination, manifest.executable)
-        if warning:
-            print(f"Warning: {warning}")
+    stage_process_manifest(destination, manifest.executable, hosting)
     if not args.no_patch:
         patch_known_game(manifest, destination, tag, args.patch_dir)
     launch = launch_executable(manifest.executable, managed, native_host)
