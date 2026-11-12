@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from pyappxportable import InstallError, InstallOptions, install_game
@@ -161,20 +162,33 @@ class RuntimeUpdateTests(unittest.TestCase):
         self.update()
         self.assertFalse((self.game / "Game.exe.manifest").exists())
 
-    def test_csharp_components_get_the_clr_bridge(self):
+    def update_on(self, platform):
+        """Update the runtime as the installer would on platform; off Windows
+        it stages for Wine."""
+        with patch("pyappxportable.installer.sys", SimpleNamespace(platform=platform)):
+            return self.update()
+
+    def with_components(self):
         (self.game / "AppxManifest.xml").write_text(
             MANIFEST.replace("</Package>", COMPONENTS)
         )
+
+    def test_csharp_components_get_the_clr_bridge(self):
+        self.with_components()
         (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"bridge"))
-        self.update()
+        self.update_on("win32")
         host = self.game / "appx-host.exe"
         self.assertTrue(host.is_file() and host.read_bytes().endswith(b"bridge"))
 
     def test_csharp_components_without_bridge_in_runtime(self):
-        (self.game / "AppxManifest.xml").write_text(
-            MANIFEST.replace("</Package>", COMPONENTS)
-        )
-        self.assertIn("no appx-host.exe", self.update())
+        self.with_components()
+        self.assertIn("no appx-host.exe", self.update_on("win32"))
+        self.assertFalse((self.game / "appx-host.exe").exists())
+
+    def test_csharp_components_get_no_bridge_under_wine(self):
+        self.with_components()
+        (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"bridge"))
+        self.assertNotIn("no appx-host.exe", self.update_on("linux"))
         self.assertFalse((self.game / "appx-host.exe").exists())
 
 
