@@ -4,9 +4,18 @@ Messages are rich Text, never markup, so the brackets in prompts and paths
 print as typed. Color turns off by itself when output is not a terminal, and
 NO_COLOR or FORCE_COLOR override that."""
 
-from typing import Callable, Dict, Optional
+from contextlib import contextmanager
+from typing import Callable, Dict, Generator, Optional
 
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    Progress,
+    TextColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
 from rich.text import Text
 
 Ask = Callable[[str], str]
@@ -50,6 +59,26 @@ def error(message: str) -> None:
 def notice(message: str) -> None:
     """Print a line to stderr, out of the way of the installer's own output."""
     ERR.print(Text(message, style="magenta"))
+
+
+@contextmanager
+def download_progress(
+    name: str, total: int, completed: int = 0
+) -> Generator[Callable[[int], None], None, None]:
+    """A progress bar for downloading total bytes of name, completed of them
+    already in hand; yields the function that advances it. Outside a terminal it
+    prints nothing."""
+    with Progress(
+        TextColumn("  {task.description}", style="cyan"),
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        TimeRemainingColumn(),
+        console=OUT,
+        disable=not OUT.is_terminal,
+    ) as progress:
+        task = progress.add_task(name, total=total, completed=completed)
+        yield lambda size: progress.advance(task, size)
 
 
 def prompt(question: str) -> str:

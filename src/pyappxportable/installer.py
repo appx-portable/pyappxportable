@@ -25,7 +25,7 @@ from pyappxportable.dependencies import (
     missing_vclibs,
 )
 from pyappxportable.desktop import make_desktop_copy, needs_desktop_copy
-from pyappxportable.downloads import download_runtime, resolve_release
+from pyappxportable.downloads import download_runtime, resolve_release, retry_prompts
 from pyappxportable.errors import InstallError
 from pyappxportable.extraction import extract_game, peek_manifest
 from pyappxportable.launchers import (
@@ -328,7 +328,14 @@ def offer_runtime_update(args, ask: Ask, source: Path) -> bool:
 def install_game(args: InstallOptions, ask: Ask = prompt) -> int:
     """Install the game the arguments and answers describe, or with update_runtime,
     update the runtime of an installed game. Every question comes before the long
-    steps start, except for a framework package that cannot be found."""
+    steps start, except for a framework package that cannot be found and a
+    download that keeps failing."""
+    with retry_prompts(None if args.yes else ask):
+        return install_or_update(args, ask)
+
+
+def install_or_update(args: InstallOptions, ask: Ask) -> int:
+    """install_game, with download retry prompts set up."""
     source = choose_package(args, ask)
     if getattr(args, "update_runtime", False) or offer_runtime_update(
         args, ask, source

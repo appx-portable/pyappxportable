@@ -17,7 +17,7 @@ pyappxportable "C:\Downloads\Game.appxbundle"
 
 On Windows, `py -m pip` and `py -m pyappxportable` also work. On macOS/Linux, use `python3` if that is your Python command. With a Python installation managed by your OS, install into a virtual environment or use `pipx install pyappxportable`.
 
-Run `pyappxportable` without arguments for prompts. Every question comes first: the package, the install folder, the Store overrides, and the launcher. The installer then runs without stopping. Press Ctrl+C at any question to cancel. Output is in color in a terminal; set `NO_COLOR=1` to turn color off. If the command is not on your PATH, use `python -m pyappxportable`. After installation, double-click `00_click2startme.bat` on Windows or `00_click2startme.command` on macOS. Linux uses `00_click2startme.sh` with Wine.
+Run `pyappxportable` without arguments for prompts. Every question comes first: the package, the install folder, the Store overrides, and the launcher. The installer then runs without stopping. Press Ctrl+C at any question to cancel. Downloads show a progress bar. After a dropped connection or a busy server they are tried again up to three times, resuming from where they stopped when the server allows it; after that, the installer asks whether to try again (with `--yes`, it stops with the error). Output is in color in a terminal; set `NO_COLOR=1` to turn color off. If the command is not on your PATH, use `python -m pyappxportable`. After installation, double-click `00_click2startme.bat` on Windows or `00_click2startme.command` on macOS. Linux uses `00_click2startme.sh` with Wine.
 
 ## Command-line options
 
