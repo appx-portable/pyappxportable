@@ -92,21 +92,28 @@ def parse_arguments(argv: List[str]):
 
 def main(argv: Optional[List[str]] = None, ask: Callable[[str], str] = input) -> int:
     """Install, printing any error as one line; returns the exit code."""
-    argv = sys.argv[1:] if argv is None else argv
+    options = parse_arguments(sys.argv[1:] if argv is None else argv)
+    report = start_update_check() if options.check_updates else None
     try:
-        options = parse_arguments(argv)
-        if options.check_updates:
-            start_update_check()
-        return install_game(options, ask)
-    except InstallError as error:
-        print(f"Error: {error}", file=sys.stderr)
-        return 1
-    except OSError as error:
-        print(f"Error: {error}", file=sys.stderr)
-        return 1
-    except (KeyboardInterrupt, EOFError):
-        print(file=sys.stderr)
-        return 1
+        code = install_game(options, ask)
+    except KeyboardInterrupt:
+        # Ctrl+C at a prompt leaves the cursor after the question.
+        print("\nCancelled.", file=sys.stderr, flush=True)
+        return 130
+    except EOFError:
+        print(
+            "\nError: no answer could be read. Pass the package and options on the"
+            " command line, with --yes to never ask.",
+            file=sys.stderr,
+            flush=True,
+        )
+        code = 1
+    except (InstallError, OSError) as error:
+        print(f"Error: {error}", file=sys.stderr, flush=True)
+        code = 1
     except Exception as error:  # pylint: disable=broad-exception-caught
-        print(f"Error: {type(error).__name__}: {error}", file=sys.stderr)
-        return 1
+        print(f"Error: {type(error).__name__}: {error}", file=sys.stderr, flush=True)
+        code = 1
+    if report is not None:
+        report(1.0)
+    return code

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import List
 from xml.etree import ElementTree
 
+from pyappxportable.console import say
 from pyappxportable.downloads import fetch
 from pyappxportable.errors import InstallError
 from pyappxportable.manifest import Manifest, local_name
@@ -272,12 +273,12 @@ def add_native_frameworks(
         for candidate in candidates:
             try:
                 add_native_framework(dependency, candidate, game, architecture)
-                print(f"Added {dependency} ({architecture}) from {candidate}")
+                say(f"Added {dependency} ({architecture}) from {candidate}")
                 break
             except (InstallError, OSError):
                 continue
         else:
-            print(f"Downloading {dependency} ({architecture})")
+            say(f"Downloading {dependency} ({architecture})")
             try:
                 download_native_framework(dependency, game, architecture)
             except InstallError as error:

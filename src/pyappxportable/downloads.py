@@ -10,6 +10,7 @@ import zipfile
 from pathlib import Path
 from typing import Optional
 
+from pyappxportable.console import warn
 from pyappxportable.constants import REPOSITORY
 from pyappxportable.errors import InstallError
 
@@ -65,8 +66,8 @@ def download_runtime(
     if wine and graphics in assets:
         unpack_release_zip(graphics, fetch(assets[graphics]), folder)
     elif wine:
-        print(
-            f"Warning: release {tag} has no Wine graphics stack; games may render black."
+        warn(
+            f"release {tag} has no Wine graphics stack; games may render black."
             " Build one with scripts/build-wined3d.sh and pass --build."
         )
     return folder

@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Callable
 
+from pyappxportable.console import confirm, say, warn
 from pyappxportable.downloads import download_verified, fetch
 from pyappxportable.errors import InstallError
 
@@ -82,7 +83,7 @@ def extract_tar_xz(data: bytes, destination: Path) -> None:
 def install_wine_devel() -> None:
     """Download Wine Devel and unpack it into ~/Applications."""
     url, sha256 = WINE_DEVEL
-    print(f"Downloading Wine Devel ({url.rsplit('/', 1)[-1]}, about 190 MB)")
+    say(f"Downloading Wine Devel ({url.rsplit('/', 1)[-1]}, about 190 MB)")
     data = download_verified(url, sha256)
     WINE_DEVEL_APP.parent.mkdir(parents=True, exist_ok=True)
     # Unpacked beside its destination and moved, so a failure leaves no half app.
@@ -92,7 +93,7 @@ def install_wine_devel() -> None:
         if not app.is_dir():
             raise InstallError(f"{url} has no {WINE_DEVEL_APP.name}.")
         os.replace(app, WINE_DEVEL_APP)
-    print(f"Installed {WINE_DEVEL_APP}")
+    say(f"Installed {WINE_DEVEL_APP}")
 
 
 def latest_gstreamer() -> str:
@@ -123,7 +124,7 @@ def install_gstreamer() -> None:
     )
     if not published or not re.fullmatch(r"[0-9a-f]{64}", published[0]):
         raise InstallError(f"{url}.sha256sum is not a SHA-256 checksum.")
-    print(f"Downloading GStreamer {version} ({name})")
+    say(f"Downloading GStreamer {version} ({name})")
     data = download_verified(url, published[0])
     with tempfile.TemporaryDirectory(prefix="installappx-gstreamer-") as temporary:
         package = Path(temporary) / name
@@ -165,23 +166,23 @@ def add_macos_dependencies(args, ask: Callable[[str], str]) -> None:
     so --yes only says how to install them."""
 
     def agreed(question: str) -> bool:
-        return ask(question).strip().lower() not in ("n", "no")
+        return confirm(ask, question)
 
     if needs_rosetta():
         if args.yes:
-            print("Warning: Wine needs Rosetta 2: softwareupdate --install-rosetta")
+            warn("Wine needs Rosetta 2: softwareupdate --install-rosetta")
         elif agreed(
             "Wine needs Rosetta 2. Install it, accepting Apple's license"
-            " (asks for your administrator password)? [Y/n]: "
+            " (asks for your administrator password)?"
         ):
             install_rosetta()
     if not wine_installed():
         if args.yes or agreed(
-            f"Wine is not installed. Download Wine Devel into {WINE_DEVEL_APP.parent}? [Y/n]: "
+            f"Wine is not installed. Download Wine Devel into {WINE_DEVEL_APP.parent}?"
         ):
             install_wine_devel()
         else:
-            print(
+            say(
                 "Install Wine, or set WINE to your Wine executable, before starting the game."
             )
     if not GSTREAMER_FRAMEWORK.is_dir():
@@ -189,14 +190,12 @@ def add_macos_dependencies(args, ask: Callable[[str], str]) -> None:
             "install the macOS runtime from https://gstreamer.freedesktop.org/download/"
         )
         if args.yes:
-            print(
-                f"Warning: games that play audio or video under Wine need GStreamer; {hint}"
-            )
+            warn(f"games that play audio or video under Wine need GStreamer; {hint}")
         elif agreed(
             "Games that play audio or video under Wine need GStreamer. Install it"
-            " (asks for your administrator password)? [Y/n]: "
+            " (asks for your administrator password)?"
         ):
             try:
                 install_gstreamer()
             except InstallError as error:
-                print(f"Warning: {error} To install it later, {hint}")
+                warn(f"{error} To install it later, {hint}")

@@ -43,14 +43,10 @@ class UpdateTests(unittest.TestCase):
                 updates, "installed_version", return_value="0.1.0"
             ), patch.object(updates.time, "time", return_value=1001), patch.object(
                 updates.urllib.request, "urlopen"
-            ) as fetch, contextlib.redirect_stderr(
-                io.StringIO()
-            ) as output:
-                updates.check_for_update()
+            ) as fetch:
+                notice = updates.update_notice()
             fetch.assert_not_called()
-            self.assertIn(
-                "python -m pip install --upgrade pyappxportable", output.getvalue()
-            )
+            self.assertIn("python -m pip install --upgrade pyappxportable", notice)
 
     def test_offline_failure_is_silent_and_cached(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -62,10 +58,8 @@ class UpdateTests(unittest.TestCase):
                 "urlopen",
                 side_effect=urllib.error.URLError("offline"),
             ) as fetch:
-                with contextlib.redirect_stderr(io.StringIO()) as output:
-                    updates.check_for_update()
-                    updates.check_for_update()
-                self.assertEqual(output.getvalue(), "")
+                self.assertIsNone(updates.update_notice())
+                self.assertIsNone(updates.update_notice())
                 self.assertEqual(fetch.call_count, 1)
 
     def test_fresh_fetch_uses_timeout_and_caches_result(self):
@@ -77,9 +71,7 @@ class UpdateTests(unittest.TestCase):
             ), patch.object(
                 updates.urllib.request, "urlopen", return_value=response
             ) as fetch:
-                with contextlib.redirect_stderr(io.StringIO()) as output:
-                    updates.check_for_update()
-                self.assertEqual(output.getvalue(), "")
+                self.assertIsNone(updates.update_notice())
                 self.assertEqual(fetch.call_args.kwargs["timeout"], 2)
             self.assertEqual(json.loads(path.read_text())["latest"], "2026.11.1")
 
@@ -103,14 +95,14 @@ class UpdateTests(unittest.TestCase):
         with patch.object(
             updates, "installed_version", return_value="1.0.dev1"
         ), patch.object(updates.urllib.request, "urlopen") as fetch:
-            updates.check_for_update()
+            self.assertIsNone(updates.update_notice())
         fetch.assert_not_called()
 
     def test_environment_opt_out(self):
         with patch.dict(
             os.environ, {"PYAPPXPORTABLE_NO_UPDATE_CHECK": "1"}
         ), patch.object(updates.threading, "Thread") as thread:
-            updates.start_update_check()
+            updates.start_update_check()(0)
         thread.assert_not_called()
 
     def test_cli_opt_out_and_help_never_start_check(self):
@@ -124,6 +116,30 @@ class UpdateTests(unittest.TestCase):
                 main(["--help"])
             self.assertEqual(result.exception.code, 0)
         check.assert_not_called()
+
+    def test_notice_waits_until_the_installer_is_done(self):
+        notice = "pyappxportable 9 is available"
+        with patch.object(
+            updates, "update_notice", return_value=notice
+        ), contextlib.redirect_stderr(io.StringIO()) as output:
+            report = updates.start_update_check()
+            self.assertEqual(output.getvalue(), "")
+            report(5)
+        self.assertIn(notice, output.getvalue())
+
+    def test_cli_prints_notice_after_prompts(self):
+        events = []
+
+        def install(_options, ask):
+            ask("Question: ")
+            return 0
+
+        with patch("pyappxportable.main.install_game", side_effect=install), patch(
+            "pyappxportable.main.start_update_check",
+            return_value=lambda wait: events.append("notice"),
+        ):
+            self.assertEqual(main([], ask=lambda _: events.append("ask") or ""), 0)
+        self.assertEqual(events, ["ask", "notice"])
 
 
 if __name__ == "__main__":

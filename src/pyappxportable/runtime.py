@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import List
 
+from pyappxportable.console import say
 from pyappxportable.constants import PROXIES
 from pyappxportable.errors import InstallError
 from pyappxportable.pe import architecture_of
@@ -79,7 +80,10 @@ def stage_runtime(  # pylint: disable=too-many-arguments
         if (build / "appx-host.exe").is_file():
             names.append("appx-host.exe")
         else:
-            print("Note: this runtime has no appx-host.exe; the game's C# components stay unavailable.")
+            say(
+                "Note: this runtime has no appx-host.exe; the game's C# components"
+                " stay unavailable."
+            )
     if native_host:
         if wine:
             raise InstallError("Native hosting requires Windows.")

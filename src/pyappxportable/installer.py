@@ -4,8 +4,9 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
+from pyappxportable.console import Ask, choose, confirm, say, warn
 from pyappxportable.dependencies import (
     VCLIBS_DOWNLOADS,
     add_native_frameworks,
@@ -40,21 +41,33 @@ from pyappxportable.pe import (
 from pyappxportable.runtime import stage_runtime
 from pyappxportable.settings import read_store, write_settings
 
-STORE_ANSWERS = {"0": "none", "1": "trial", "2": "iap", "3": "both"}
+STORE_LABELS = {
+    "none": "none",
+    "trial": "unlock the full game in trial mode",
+    "iap": "complete in-app purchases without the Store",
+    "both": "both",
+}
 
 
-def choose_package(args, ask: Callable[[str], str]) -> Path:
-    """The package or installed game folder, from the arguments or the prompt."""
-    package = args.package
-    if not package and not args.yes:
-        package = ask("Game package (.appxbundle, .appx or extracted folder): ")
-    if not unquote_path(package or ""):
-        raise InstallError("No game package given.")
-    return absolute(package)
+def choose_package(args, ask: Ask) -> Path:
+    """The package or installed game folder, from the arguments or the prompt;
+    the prompt asks again for a path that does not exist."""
+    if args.package or args.yes:
+        if not unquote_path(args.package or ""):
+            raise InstallError("No game package given.")
+        return absolute(args.package)
+    while True:
+        answer = ask("Game package (.appxbundle, .appx or extracted folder): ")
+        if not unquote_path(answer):
+            raise InstallError("No game package given.")
+        package = absolute(answer)
+        if package.exists():
+            return package
+        say(f"{package} does not exist. Drag the package here, or paste its path.")
 
 
 def choose_folders(
-    args, ask: Callable[[str], str], source: Optional[Path] = None
+    args, ask: Ask, source: Optional[Path] = None
 ) -> Tuple[Path, Path, Manifest]:
     """The package, the folder to install it in, and the package's manifest."""
     source = choose_package(args, ask) if source is None else source
@@ -64,7 +77,8 @@ def choose_folders(
         default = source.parent / (manifest.name + "-portable")
     destination = args.dest
     if destination is None and not args.yes:
-        destination = ask(f"Folder to install the game in [{default}]: ")
+        say(f"Found {manifest.name} {manifest.version}.")
+        destination = ask(f"Install into [Enter for {default}]: ")
     chosen = unquote_path(destination or "")
     return source, absolute(chosen) if chosen else default, manifest
 
@@ -84,13 +98,13 @@ def try_vclibs(
 
 
 def add_missing_vclibs(
-    args, ask: Callable[[str], str], manifest: Manifest, game: Path, architecture: str
+    args, ask: Ask, manifest: Manifest, game: Path, architecture: str
 ) -> None:
     """Add each VCLibs dependency the game lacks: --dependencies, download, then ask."""
     for dependency in missing_vclibs(manifest, game):
         refused = try_vclibs(dependency, args.dependencies, game, architecture)
         if dependency in missing_vclibs(manifest, game):
-            print(f"Downloading {dependency} ({architecture})")
+            say(f"Downloading {dependency} ({architecture})")
             try:
                 download_vclibs(dependency, game, architecture)
             except InstallError as error:
@@ -103,15 +117,15 @@ def add_missing_vclibs(
             )
         while dependency in missing_vclibs(manifest, game):
             for message in refused:
-                print(message)
-            print(missing)
+                say(message)
+            say(missing)
             answer = ask(f"{dependency} .appx or folder: ")
             if not unquote_path(answer):
                 raise InstallError(f"Missing {dependency} ({architecture}).")
             refused = try_vclibs(dependency, [answer], game, architecture)
 
 
-def stage_dlls(  # pylint: disable=too-many-arguments
+def stage_dlls(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     args,
     game: Path,
     architecture: str,
@@ -133,7 +147,7 @@ def stage_dlls(  # pylint: disable=too-many-arguments
         )
         return args.release
     tag = resolve_release(args.release)
-    print(f"Downloading Appx Portable {tag} ({architecture})")
+    say(f"Downloading Appx Portable {tag} ({architecture})")
     with tempfile.TemporaryDirectory(prefix="installappx-runtime-") as temporary:
         stage_runtime(
             download_runtime(tag, architecture, Path(temporary), wine=wine),
@@ -162,21 +176,21 @@ def patch_known_game(
         tag = resolve_release(None)
     output = apply_known_patch(manifest, game, tag, local)
     if output:
-        print(output)
+        say(output)
 
 
-def choose_store(args, ask: Callable[[str], str], game: Path) -> Optional[str]:
+def choose_store(args, ask: Ask, game: Path) -> Optional[str]:
     """The Store choice from --store or the prompt; None keeps the current one."""
     if args.store is not None or args.yes:
         return args.store
-    current = read_store(game)
-    while True:
-        answer = ask(
-            "Store options: 1 unlock trial, 2 stub in-app purchases, 3 both, 0 neither"
-            f" [Enter keeps {current}]: "
-        ).strip()
-        if not answer or answer in STORE_ANSWERS:
-            return STORE_ANSWERS.get(answer)
+    return choose(ask, "Store overrides:", STORE_LABELS, read_store(game))
+
+
+def choose_launcher(args, ask: Ask) -> bool:
+    """Whether to write the launcher, from --launcher or the prompt."""
+    if args.launcher is not None:
+        return args.launcher
+    return args.yes or confirm(ask, f"Create the {LAUNCHER} launcher?")
 
 
 @dataclass
@@ -222,7 +236,7 @@ def stage_process_manifest(game: Path, manifest: Manifest, hosting: Hosting) -> 
         return
     warning = write_process_manifest(game, manifest.executable)
     if warning:
-        print(f"Warning: {warning}")
+        warn(warning)
 
 
 def installed_game(folder: Path) -> bool:
@@ -266,7 +280,7 @@ def update_runtime(args, game: Path) -> int:
     executable = game / manifest.executable
     if not executable.is_file():
         raise InstallError(f"The game folder has no {manifest.executable}.")
-    print(
+    say(
         f"Updating the Appx Portable runtime of {manifest.name} {manifest.version}"
         f" in {game}"
     )
@@ -282,36 +296,38 @@ def update_runtime(args, game: Path) -> int:
     stage_process_manifest(game, manifest, hosting)
     if (manifest.name, manifest.version) in KNOWN_PATCHES:
         # Patches change game files, which are not extracted again here.
-        print(
+        say(
             "Note: this game has a compatibility patch, which is not applied again."
             " If the game misbehaves, reinstall it from its package."
         )
-    print(
+    say(
         f"Updated the runtime{f' to {tag}' if tag else ''}. Saves and settings were kept."
     )
     return 0
 
 
-def offer_runtime_update(args, ask: Callable[[str], str], source: Path) -> bool:
+def offer_runtime_update(args, ask: Ask, source: Path) -> bool:
     """Whether to only update the runtime of an installed game given as the package."""
     if args.yes or args.dest is not None or not installed_game(source):
         return False
-    answer = ask(
-        f"{source} is an installed game. Update only its Appx Portable runtime? [Y/n]: "
+    return confirm(
+        ask, f"{source} is an installed game. Update only its Appx Portable runtime?"
     )
-    return answer.strip().lower() not in ("n", "no")
 
 
-def install_game(args: InstallOptions, ask: Callable[[str], str] = input) -> int:
+def install_game(args: InstallOptions, ask: Ask = input) -> int:
     """Install the game the arguments and answers describe, or with update_runtime,
-    update the runtime of an installed game."""
+    update the runtime of an installed game. Every question comes before the long
+    steps start, except for a framework package that cannot be found."""
     source = choose_package(args, ask)
     if getattr(args, "update_runtime", False) or offer_runtime_update(
         args, ask, source
     ):
         return update_runtime(args, source)
     source, destination, manifest = choose_folders(args, ask, source)
-    print(f"Installing {manifest.name} {manifest.version} into {destination}")
+    store = choose_store(args, ask, destination)
+    launcher = choose_launcher(args, ask)
+    say(f"Installing {manifest.name} {manifest.version} into {destination}")
     manifest = extract_game(source, destination)
     executable = destination / manifest.executable
     hosting = game_hosting(destination, executable)
@@ -328,11 +344,7 @@ def install_game(args: InstallOptions, ask: Callable[[str], str] = input) -> int
     launch = launch_executable(manifest.executable, managed, native_host)
     if not managed and not native_host and (args.desktop_copy or needs_desktop_copy()):
         launch = make_desktop_copy(destination, manifest.executable)
-    write_settings(destination, choose_store(args, ask, destination))
-    launcher = args.launcher
-    if launcher is None:
-        answer = "" if args.yes else ask(f"Create the {LAUNCHER} launcher? [Y/n]: ")
-        launcher = answer.strip().lower() not in ("n", "no")
+    write_settings(destination, store)
     if launcher:
         launch = str(
             write_launcher(
@@ -346,14 +358,16 @@ def install_game(args: InstallOptions, ask: Callable[[str], str] = input) -> int
     if sys.platform == "darwin":
         add_macos_dependencies(args, ask)
     if managed and sys.platform != "win32":
-        print(f"Warning: {MANAGED_UNDER_WINE}")
+        warn(MANAGED_UNDER_WINE)
     warning = path_warning(
         destination, [str(p) for p in destination.rglob("*") if p.is_file()]
     )
     if warning:
-        print(f"Warning: {warning}")
-    print(f"Start the game with {destination / launch}")
-    print(
-        f"Store options: {read_store(destination)}. Settings: {destination / 'appx-portable.ini'}"
+        warn(warning)
+    say()
+    say(f"Done. Start the game with {destination / launch}")
+    say(
+        f"Store overrides: {read_store(destination)}."
+        f" Settings: {destination / 'appx-portable.ini'}"
     )
     return 0
