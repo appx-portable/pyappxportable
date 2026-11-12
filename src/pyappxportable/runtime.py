@@ -49,6 +49,30 @@ def check_wine_graphics(build: Path) -> None:
             )
 
 
+def host_files(
+    build: Path, managed: bool, wine: bool, native_host: bool, clr_components: bool
+) -> List[str]:
+    """The host executables the game needs: the CLR host for a managed game or
+    for a native game's C# components, and the native host."""
+    names = []
+    if managed:
+        names.append("appx-host.exe")
+    elif clr_components and not wine:
+        # Releases before the component bridge have no use for it.
+        if (build / "appx-host.exe").is_file():
+            names.append("appx-host.exe")
+        else:
+            note(
+                "this runtime has no appx-host.exe; the game's C# components"
+                " stay unavailable."
+            )
+    if native_host:
+        if wine:
+            raise InstallError("Native hosting requires Windows.")
+        names.append("appx-native-host.exe")
+    return names
+
+
 # Architecture and hosting/graphics choices independently select runtime files.
 def stage_runtime(  # pylint: disable=too-many-arguments
     build: Path,
@@ -73,21 +97,7 @@ def stage_runtime(  # pylint: disable=too-many-arguments
     names = ["appxportable.dll", *PROXIES]
     if (build / "XAudio2_9.dll").is_file():
         names.append("XAudio2_9.dll")
-    if managed:
-        names.append("appx-host.exe")
-    elif clr_components and not wine:
-        # Releases before the component bridge have no use for it.
-        if (build / "appx-host.exe").is_file():
-            names.append("appx-host.exe")
-        else:
-            note(
-                "this runtime has no appx-host.exe; the game's C# components"
-                " stay unavailable."
-            )
-    if native_host:
-        if wine:
-            raise InstallError("Native hosting requires Windows.")
-        names.append("appx-native-host.exe")
+    names += host_files(build, managed, wine, native_host, clr_components)
     graphics = wine and (build / WINE_GRAPHICS_MANIFEST).is_file()
     if graphics:
         check_wine_graphics(build)
