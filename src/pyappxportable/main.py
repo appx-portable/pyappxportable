@@ -6,8 +6,9 @@ installed game folder to replace only its Appx Portable runtime DLLs."""
 
 import argparse
 import sys
-from typing import Callable, List, Optional
+from typing import List, Optional
 
+from pyappxportable.console import ERR, Ask, error, notice, prompt
 from pyappxportable.errors import InstallError
 from pyappxportable.installer import install_game
 from pyappxportable.launchers import LAUNCHER
@@ -90,7 +91,7 @@ def parse_arguments(argv: List[str]):
     return InstallOptions(**vars(parser.parse_args(argv)))
 
 
-def main(argv: Optional[List[str]] = None, ask: Callable[[str], str] = input) -> int:
+def main(argv: Optional[List[str]] = None, ask: Ask = prompt) -> int:
     """Install, printing any error as one line; returns the exit code."""
     options = parse_arguments(sys.argv[1:] if argv is None else argv)
     report = start_update_check() if options.check_updates else None
@@ -98,21 +99,21 @@ def main(argv: Optional[List[str]] = None, ask: Callable[[str], str] = input) ->
         code = install_game(options, ask)
     except KeyboardInterrupt:
         # Ctrl+C at a prompt leaves the cursor after the question.
-        print("\nCancelled.", file=sys.stderr, flush=True)
+        ERR.print()
+        notice("Cancelled.")
         return 130
     except EOFError:
-        print(
-            "\nError: no answer could be read. Pass the package and options on the"
-            " command line, with --yes to never ask.",
-            file=sys.stderr,
-            flush=True,
+        ERR.print()
+        error(
+            "no answer could be read. Pass the package and options on the"
+            " command line, with --yes to never ask."
         )
         code = 1
-    except (InstallError, OSError) as error:
-        print(f"Error: {error}", file=sys.stderr, flush=True)
+    except (InstallError, OSError) as failure:
+        error(str(failure))
         code = 1
-    except Exception as error:  # pylint: disable=broad-exception-caught
-        print(f"Error: {type(error).__name__}: {error}", file=sys.stderr, flush=True)
+    except Exception as failure:  # pylint: disable=broad-exception-caught
+        error(f"{type(failure).__name__}: {failure}")
         code = 1
     if report is not None:
         report(1.0)

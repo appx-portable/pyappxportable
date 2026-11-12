@@ -8,7 +8,7 @@ This package contains no games or Microsoft runtime files. Supply your own game 
 
 ## Install
 
-Requires **Python 3.8 or later**, with pip. Use a Python release compatible with your Windows version; managed XAML games need Windows 10 1903 or later and .NET Framework 4.x. macOS/Wine support is experimental; managed games and games that require the native host need Windows.
+Requires **Python 3.9 or later**, with pip. Use a Python release compatible with your Windows version; managed XAML games need Windows 10 1903 or later and .NET Framework 4.x. macOS/Wine support is experimental; managed games and games that require the native host need Windows.
 
 ```sh
 python -m pip install pyappxportable
@@ -17,7 +17,7 @@ pyappxportable "C:\Downloads\Game.appxbundle"
 
 On Windows, `py -m pip` and `py -m pyappxportable` also work. On macOS/Linux, use `python3` if that is your Python command. With a Python installation managed by your OS, install into a virtual environment or use `pipx install pyappxportable`.
 
-Run `pyappxportable` without arguments for prompts. Every question comes first: the package, the install folder, the Store overrides, and the launcher. The installer then runs without stopping. Press Ctrl+C at any question to cancel. If the command is not on your PATH, use `python -m pyappxportable`. After installation, double-click `00_click2startme.bat` on Windows or `00_click2startme.command` on macOS. Linux uses `00_click2startme.sh` with Wine.
+Run `pyappxportable` without arguments for prompts. Every question comes first: the package, the install folder, the Store overrides, and the launcher. The installer then runs without stopping. Press Ctrl+C at any question to cancel. Output is in color in a terminal; set `NO_COLOR=1` to turn color off. If the command is not on your PATH, use `python -m pyappxportable`. After installation, double-click `00_click2startme.bat` on Windows or `00_click2startme.command` on macOS. Linux uses `00_click2startme.sh` with Wine.
 
 ## Command-line options
 
@@ -98,7 +98,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-CI lints, runs the update/release tests, builds wheel/source distributions, checks their metadata, and installs the wheel on Windows and Linux with Python 3.8, and on Windows, macOS, and Linux with the current Python.
+CI lints, runs the update/release tests, builds wheel/source distributions, checks their metadata, and installs the wheel on Windows and Linux with Python 3.9, and on Windows, macOS, and Linux with the current Python.
 
 Pushes to `main` automatically publish to PyPI and create a GitHub release when any pushed commit starts with `feat:`, `fix:`, `perf:`, or `refactor:` (including scopes such as `fix(cli):`). Any conventional commit with `!` or a `BREAKING CHANGE:` footer also releases. Documentation, test, and chore commits only validate unless they declare a breaking change. A manual workflow run on `main` always releases. Publication requires the existing PyPI Trusted Publisher for workflow `build.yaml` and GitHub environment `pypi`.
 

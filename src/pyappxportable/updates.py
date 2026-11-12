@@ -16,6 +16,8 @@ from typing import Callable, List, Optional
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
 
+from pyappxportable.console import ERR, notice
+
 CHECK_INTERVAL = 24 * 60 * 60
 PYPI_URL = "https://pypi.org/pypi/pyappxportable/json"
 
@@ -154,6 +156,7 @@ def start_update_check() -> Callable[[float], None]:
     def report(wait: float = 1.0) -> None:
         thread.join(wait)
         if notices and notices[0]:
-            print(f"\n{notices[0]}", file=sys.stderr, flush=True)
+            ERR.print()
+            notice(notices[0])
 
     return report

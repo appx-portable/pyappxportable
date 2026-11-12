@@ -57,10 +57,13 @@ class PromptTests(unittest.TestCase):
         missing = str(self.package.parent / "Missing.appx")
         ask, questions = answering(missing, f'"{self.package}"', "", "1", "n")
         options = InstallOptions(yes=False, launcher=None)
-        with patch(
-            "pyappxportable.installer.extract_game",
-            side_effect=InstallError("extracting"),
-        ), contextlib.redirect_stdout(io.StringIO()) as output:
+        with (
+            patch(
+                "pyappxportable.installer.extract_game",
+                side_effect=InstallError("extracting"),
+            ),
+            contextlib.redirect_stdout(io.StringIO()) as output,
+        ):
             with self.assertRaisesRegex(InstallError, "extracting"):
                 install_game(options, ask)
         self.assertEqual(len(questions), 5)

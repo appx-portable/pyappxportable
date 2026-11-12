@@ -60,9 +60,10 @@ class RuntimeUpdateTests(unittest.TestCase):
             (self.build / name).write_bytes(pe_image(dll=True, marker=b"new"))
 
     def run_main(self, *arguments):
-        with contextlib.redirect_stdout(
-            io.StringIO()
-        ) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+        with (
+            contextlib.redirect_stdout(io.StringIO()) as out,
+            contextlib.redirect_stderr(io.StringIO()) as err,
+        ):
             code = main([*arguments, "--no-update-check"])
         return code, out.getvalue() + err.getvalue()
 
@@ -121,10 +122,13 @@ class RuntimeUpdateTests(unittest.TestCase):
     def test_declined_offer_installs_a_copy(self):
         answers = iter([str(self.game), "n"])
         options = InstallOptions(build=str(self.build), yes=False)
-        with patch(
-            "pyappxportable.installer.choose_folders",
-            side_effect=InstallError("installing"),
-        ), self.assertRaisesRegex(InstallError, "installing"):
+        with (
+            patch(
+                "pyappxportable.installer.choose_folders",
+                side_effect=InstallError("installing"),
+            ),
+            self.assertRaisesRegex(InstallError, "installing"),
+        ):
             install_game(options, lambda _: next(answers))
         self.assertTrue((self.game / "appxportable.dll").read_bytes().endswith(b"old"))
 

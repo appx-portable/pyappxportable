@@ -1,18 +1,64 @@
-"""Terminal output and prompts, kept in order with each other."""
+"""Terminal output and prompts in color, kept in order with each other.
+
+Messages are rich Text, never markup, so the brackets in prompts and paths
+print as typed. Color turns off by itself when output is not a terminal, and
+NO_COLOR or FORCE_COLOR override that."""
 
 from typing import Callable, Dict, Optional
 
+from rich.console import Console
+from rich.text import Text
+
 Ask = Callable[[str], str]
 
+# soft_wrap: long paths wrap in the terminal instead of being broken by
+# inserted newlines, so they can still be copied.
+OUT = Console(soft_wrap=True, highlight=False, emoji=False)
+ERR = Console(stderr=True, soft_wrap=True, highlight=False, emoji=False)
 
-def say(message: str = "") -> None:
+
+def say(message: str = "", style: Optional[str] = None) -> None:
     """Print a line now, so it lands before the next prompt even when piped."""
-    print(message, flush=True)
+    OUT.print(Text(message, style=style or ""))
+
+
+def step(message: str) -> None:
+    """Print the start of a long step: installing, downloading."""
+    say(message, "bold cyan")
+
+
+def note(message: str) -> None:
+    """Print a side remark."""
+    say(f"Note: {message}", "dim")
+
+
+def done(message: str) -> None:
+    """Print the outcome of a finished run."""
+    say(message, "bold green")
 
 
 def warn(message: str) -> None:
     """Print a warning line."""
-    say(f"Warning: {message}")
+    OUT.print(Text.assemble(("Warning: ", "bold yellow"), (message, "yellow")))
+
+
+def error(message: str) -> None:
+    """Print an error line to stderr."""
+    ERR.print(Text.assemble(("Error: ", "bold red"), (message, "red")))
+
+
+def notice(message: str) -> None:
+    """Print a line to stderr, out of the way of the installer's own output."""
+    ERR.print(Text(message, style="magenta"))
+
+
+def prompt(question: str) -> str:
+    """input() with the question in bold and its [default] hint dimmed."""
+    text = Text(question, style="bold")
+    hint = question.rfind(" [")
+    if hint != -1 and question.endswith("]: "):
+        text.stylize("not bold dim", hint + 1, len(question) - 2)
+    return OUT.input(text)
 
 
 def confirm(ask: Ask, question: str) -> bool:
@@ -26,9 +72,9 @@ def choose(
     """A numbered menu of choices (value: label); Enter keeps current and returns
     None. The number or the value itself is accepted."""
     values = list(choices)
-    say(title)
+    say(title, "bold")
     for number, value in enumerate(values):
-        say(f"  {number}  {choices[value]}")
+        OUT.print(Text.assemble((f"  {number}  ", "bold cyan"), choices[value]))
     while True:
         answer = ask(f"Choice [Enter keeps {current}]: ").strip().lower()
         if not answer:
@@ -37,4 +83,4 @@ def choose(
             return values[int(answer)]
         if answer in choices:
             return answer
-        say(f"Enter a number from 0 to {len(values) - 1}, or press Enter.")
+        say(f"Enter a number from 0 to {len(values) - 1}, or press Enter.", "yellow")

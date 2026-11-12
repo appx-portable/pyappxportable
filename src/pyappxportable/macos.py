@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Callable
 
-from pyappxportable.console import confirm, say, warn
+from pyappxportable.console import confirm, done, say, step, warn
 from pyappxportable.downloads import download_verified, fetch
 from pyappxportable.errors import InstallError
 
@@ -83,7 +83,7 @@ def extract_tar_xz(data: bytes, destination: Path) -> None:
 def install_wine_devel() -> None:
     """Download Wine Devel and unpack it into ~/Applications."""
     url, sha256 = WINE_DEVEL
-    say(f"Downloading Wine Devel ({url.rsplit('/', 1)[-1]}, about 190 MB)")
+    step(f"Downloading Wine Devel ({url.rsplit('/', 1)[-1]}, about 190 MB)")
     data = download_verified(url, sha256)
     WINE_DEVEL_APP.parent.mkdir(parents=True, exist_ok=True)
     # Unpacked beside its destination and moved, so a failure leaves no half app.
@@ -93,7 +93,7 @@ def install_wine_devel() -> None:
         if not app.is_dir():
             raise InstallError(f"{url} has no {WINE_DEVEL_APP.name}.")
         os.replace(app, WINE_DEVEL_APP)
-    say(f"Installed {WINE_DEVEL_APP}")
+    done(f"Installed {WINE_DEVEL_APP}")
 
 
 def latest_gstreamer() -> str:
@@ -124,7 +124,7 @@ def install_gstreamer() -> None:
     )
     if not published or not re.fullmatch(r"[0-9a-f]{64}", published[0]):
         raise InstallError(f"{url}.sha256sum is not a SHA-256 checksum.")
-    say(f"Downloading GStreamer {version} ({name})")
+    step(f"Downloading GStreamer {version} ({name})")
     data = download_verified(url, published[0])
     with tempfile.TemporaryDirectory(prefix="installappx-gstreamer-") as temporary:
         package = Path(temporary) / name

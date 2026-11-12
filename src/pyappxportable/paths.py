@@ -34,5 +34,5 @@ def unquote_path(text: str) -> str:
 
 
 def absolute(path: str) -> Path:
-    """An absolute path: Python 3.8/3.9 on Windows resolve a missing one to itself."""
+    """An absolute path: Python 3.9 on Windows resolves a missing one to itself."""
     return Path(os.path.abspath(Path(unquote_path(path)).expanduser())).resolve()

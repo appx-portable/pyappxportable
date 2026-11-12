@@ -8,14 +8,14 @@ dynamic = ["version"]
 authors = [{ name = "yell0wsuit" }]
 description = "Install Windows Store game packages as portable Appx Portable games."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE*"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dependencies = ["packaging >= 20"]
+dependencies = ["packaging >= 20", "rich >= 15"]
 
 [project.optional-dependencies]
 dev = ["build", "pylint", "twine", "black"]
@@ -41,10 +41,10 @@ packages = ["src/pyappxportable"]
 include = ["/src", "/README.md", "/LICENSE*", "/pyproject.toml"]
 
 [tool.pylint.main]
-py-version = "3.8"
+py-version = "3.9"
 
 [tool.pylint.format]
 max-line-length = 100
 
 [tool.black]
-target-version = ["py38"]
+target-version = ["py39"]
