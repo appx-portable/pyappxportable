@@ -21,6 +21,9 @@ class Manifest:
     executable: str
     dependencies: List[str]
     universal: bool = False  # a Windows 10 package: it names a TargetDeviceFamily
+    # C# Windows Runtime components, which Windows serves through CLRHost.dll;
+    # the shim hosts them on the desktop CLR through appx-host.exe.
+    clr_components: bool = False
 
 
 def local_name(element) -> str:
@@ -58,4 +61,8 @@ def read_manifest(data: bytes) -> Manifest:
             e.get("Name", "") for e in elements if local_name(e) == "PackageDependency"
         ],
         universal=any(local_name(e) == "TargetDeviceFamily" for e in elements),
+        clr_components=any(
+            local_name(e) == "Path" and (e.text or "").strip().lower() == "clrhost.dll"
+            for e in elements
+        ),
     )

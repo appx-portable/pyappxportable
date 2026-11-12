@@ -127,9 +127,10 @@ def native_host_application(game: Path, executable: Path) -> bool:
 
 
 def package_has_xaml(game: Path) -> bool:
-    """Compiled XAML: .xbf files, loose or named in resources.pri. The shim's
-    native host makes the same check to choose XAML Islands over a CoreWindow."""
-    if any(Path(game).rglob("*.xbf")):
+    """XAML pages: .xbf or Windows 8.0 source .xaml files, or .xbf names in
+    resources.pri. The shim makes the same check to run a native game on
+    Windows' XAML in an island instead of a CoreWindow."""
+    if any(Path(game).rglob("*.xbf")) or any(Path(game).rglob("*.xaml")):
         return True
     pri = Path(game) / "resources.pri"
     data = pri.read_bytes() if pri.is_file() else b""
@@ -163,6 +164,7 @@ def write_process_manifest(game: Path, executable: str) -> Optional[str]:
     if b"urn:schemas-microsoft-com:asm.v1" in path.read_bytes():
         return (
             f"{executable} embeds its own manifest, so Windows ignores"
-            f" {path.name}.manifest and XAML may refuse to start."
+            f" {path.name}.manifest: the game keeps the portable XAML backend,"
+            " or, started by appx-native-host.exe, XAML may refuse to start."
         )
     return None

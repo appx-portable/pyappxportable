@@ -57,10 +57,13 @@ def stage_runtime(  # pylint: disable=too-many-arguments
     *,
     wine: bool = False,
     native_host: bool = False,
+    clr_components: bool = False,
 ) -> List[str]:
     """Copy the shim, proxies and the selected CLR or native host into game.
 
-    Under Wine, a build's patched graphics stack goes beside them too."""
+    A native game with C# components also gets appx-host.exe, whose bridge the
+    shim calls to host them on the desktop CLR. Under Wine, a build's patched
+    graphics stack goes beside them too."""
     if managed and architecture == "x64":
         raise InstallError(
             "Managed x64 games are not supported; managed hosting is x86 only."
@@ -71,6 +74,12 @@ def stage_runtime(  # pylint: disable=too-many-arguments
         names.append("XAudio2_9.dll")
     if managed:
         names.append("appx-host.exe")
+    elif clr_components and not wine:
+        # Releases before the component bridge have no use for it.
+        if (build / "appx-host.exe").is_file():
+            names.append("appx-host.exe")
+        else:
+            print("Note: this runtime has no appx-host.exe; the game's C# components stay unavailable.")
     if native_host:
         if wine:
             raise InstallError("Native hosting requires Windows.")

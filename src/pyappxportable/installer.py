@@ -111,8 +111,13 @@ def add_missing_vclibs(
             refused = try_vclibs(dependency, [answer], game, architecture)
 
 
-def stage_dlls(
-    args, game: Path, architecture: str, managed: bool, native_host: bool = False
+def stage_dlls(  # pylint: disable=too-many-arguments
+    args,
+    game: Path,
+    architecture: str,
+    managed: bool,
+    native_host: bool = False,
+    clr_components: bool = False,
 ) -> Optional[str]:
     """Copy the runtime from --build or the release; returns the release tag used."""
     wine = sys.platform != "win32"
@@ -124,6 +129,7 @@ def stage_dlls(
             managed,
             wine=wine,
             native_host=native_host,
+            clr_components=clr_components,
         )
         return args.release
     tag = resolve_release(args.release)
@@ -136,6 +142,7 @@ def stage_dlls(
             managed,
             wine=wine,
             native_host=native_host,
+            clr_components=clr_components,
         )
     return tag
 
@@ -197,12 +204,25 @@ def game_hosting(game: Path, executable: Path) -> Hosting:
     return Hosting(architecture, managed, native_compiled, native_host)
 
 
-def stage_process_manifest(game: Path, executable: str, hosting: Hosting) -> None:
-    """Only XAML runs in an island, which needs the manifest; CoreWindow games do not."""
-    if hosting.native_host and not hosting.native_compiled and package_has_xaml(game):
-        warning = write_process_manifest(game, executable)
-        if warning:
-            print(f"Warning: {warning}")
+# Known native XAML games that keep the portable XAML backend: Rayman's patch
+# binds its loose caption XAML to that backend.
+PORTABLE_XAML = {("Ubisoft.RaymanFiestaRunWindows10Edition", "1.0.23.0")}
+
+
+def stage_process_manifest(game: Path, manifest: Manifest, hosting: Hosting) -> None:
+    """Native XAML games run Windows' XAML in an island, which needs the
+    manifest; CoreWindow, managed and .NET Native games do not. Without it, a
+    game that imports a proxy keeps the portable XAML backend."""
+    # Wine has no XAML Islands.
+    if sys.platform != "win32" or hosting.managed or hosting.native_compiled:
+        return
+    if not package_has_xaml(game):
+        return
+    if (manifest.name, manifest.version) in PORTABLE_XAML:
+        return
+    warning = write_process_manifest(game, manifest.executable)
+    if warning:
+        print(f"Warning: {warning}")
 
 
 def installed_game(folder: Path) -> bool:
@@ -252,9 +272,14 @@ def update_runtime(args, game: Path) -> int:
     )
     hosting = game_hosting(game, executable)
     tag = stage_dlls(
-        args, game, hosting.architecture, hosting.managed, hosting.native_host
+        args,
+        game,
+        hosting.architecture,
+        hosting.managed,
+        hosting.native_host,
+        manifest.clr_components,
     )
-    stage_process_manifest(game, manifest.executable, hosting)
+    stage_process_manifest(game, manifest, hosting)
     if (manifest.name, manifest.version) in KNOWN_PATCHES:
         # Patches change game files, which are not extracted again here.
         print(
@@ -294,8 +319,10 @@ def install_game(args: InstallOptions, ask: Callable[[str], str] = input) -> int
     native_host = hosting.native_host
     add_missing_vclibs(args, ask, manifest, destination, architecture)
     add_native_frameworks(manifest, destination, architecture, args.dependencies)
-    tag = stage_dlls(args, destination, architecture, managed, native_host)
-    stage_process_manifest(destination, manifest.executable, hosting)
+    tag = stage_dlls(
+        args, destination, architecture, managed, native_host, manifest.clr_components
+    )
+    stage_process_manifest(destination, manifest, hosting)
     if not args.no_patch:
         patch_known_game(manifest, destination, tag, args.patch_dir)
     launch = launch_executable(manifest.executable, managed, native_host)

@@ -3,6 +3,7 @@
 import contextlib
 import io
 import struct
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -126,6 +127,60 @@ class RuntimeUpdateTests(unittest.TestCase):
         ), self.assertRaisesRegex(InstallError, "installing"):
             install_game(options, lambda _: next(answers))
         self.assertTrue((self.game / "appxportable.dll").read_bytes().endswith(b"old"))
+
+    def update(self):
+        code, output = self.run_main(
+            str(self.game), "--update-runtime", "--build", str(self.build), "--yes"
+        )
+        self.assertEqual(code, 0, output)
+        return output
+
+    @unittest.skipUnless(sys.platform == "win32", "XAML Islands need Windows")
+    def test_native_xaml_game_gets_island_manifest(self):
+        # Windows 8.0 games ship source XAML; it runs on Windows' XAML in an island.
+        (self.game / "MainPage.xaml").write_text("<Page/>")
+        self.update()
+        manifest = self.game / "Game.exe.manifest"
+        self.assertIn('maxversiontested Id="10.0.18362.0"', manifest.read_text())
+
+    def test_corewindow_game_gets_no_manifest(self):
+        self.update()
+        self.assertFalse((self.game / "Game.exe.manifest").exists())
+
+    def test_known_portable_xaml_game_gets_no_manifest(self):
+        (self.game / "AppxManifest.xml").write_text(
+            MANIFEST.replace(
+                "Example.Game", "Ubisoft.RaymanFiestaRunWindows10Edition"
+            ).replace("1.0.0.0", "1.0.23.0")
+        )
+        (self.game / "MainPage.xaml").write_text("<Page/>")
+        self.update()
+        self.assertFalse((self.game / "Game.exe.manifest").exists())
+
+    def test_csharp_components_get_the_clr_bridge(self):
+        (self.game / "AppxManifest.xml").write_text(
+            MANIFEST.replace("</Package>", COMPONENTS)
+        )
+        (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"bridge"))
+        self.update()
+        host = self.game / "appx-host.exe"
+        self.assertTrue(host.is_file() and host.read_bytes().endswith(b"bridge"))
+
+    def test_csharp_components_without_bridge_in_runtime(self):
+        (self.game / "AppxManifest.xml").write_text(
+            MANIFEST.replace("</Package>", COMPONENTS)
+        )
+        self.assertIn("no appx-host.exe", self.update())
+        self.assertFalse((self.game / "appx-host.exe").exists())
+
+
+COMPONENTS = """\
+  <Extensions><Extension Category="windows.activatableClass.inProcessServer">
+    <InProcessServer><Path>CLRHost.dll</Path>
+      <ActivatableClass ActivatableClassId="Analytics.Api" ThreadingModel="both"/>
+    </InProcessServer></Extension></Extensions>
+</Package>
+"""
 
 
 if __name__ == "__main__":
