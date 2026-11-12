@@ -59,9 +59,11 @@ class ReleaseTests(unittest.TestCase):
                 "GITHUB_EVENT_NAME": "push",
                 "GITHUB_REPOSITORY": "yell0wsuit/pyappxportable",
             }
-            with patch.dict(os.environ, environment), patch.object(
-                release, "github_versions", return_value=[]
-            ) as github, patch.object(release, "pypi_versions", return_value=[]):
+            with (
+                patch.dict(os.environ, environment),
+                patch.object(release, "github_versions", return_value=[]) as github,
+                patch.object(release, "pypi_versions", return_value=[]),
+            ):
                 event.write_text(
                     json.dumps(
                         {

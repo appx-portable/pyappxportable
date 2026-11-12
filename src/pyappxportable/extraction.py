@@ -138,9 +138,10 @@ def select_bundle_packages(bundle: zipfile.ZipFile) -> Tuple[str, List[str]]:
     found = [a for a in BUNDLE_ARCHITECTURES if a in applications]
     if found:
         # Every application package of a bundle targets the same Windows.
-        with bundle.open(entry(applications[found[0]])) as stream, zipfile.ZipFile(
-            stream
-        ) as inner:
+        with (
+            bundle.open(entry(applications[found[0]])) as stream,
+            zipfile.ZipFile(stream) as inner,
+        ):
             universal = package_manifest(zip_entries(inner)).universal
         order = (
             UNIVERSAL_BUNDLE_ARCHITECTURES
@@ -222,9 +223,10 @@ def extract_bundle(bundle: zipfile.ZipFile, destination: Path) -> Manifest:
     """Stage a bundle's game package, then add its resource packages' files."""
     application, resources = select_bundle_packages(bundle)
     # The zips close before their temporary folder is removed.
-    with tempfile.TemporaryDirectory(
-        prefix="installappx-"
-    ) as temporary, ExitStack() as stack:
+    with (
+        tempfile.TemporaryDirectory(prefix="installappx-") as temporary,
+        ExitStack() as stack,
+    ):
         try:
             archives = [
                 stack.enter_context(
@@ -268,9 +270,10 @@ def peek_manifest(source: Path) -> Manifest:
                 or "AppxMetadata/AppxBundleManifest.xml" in archive.namelist()
             ):
                 application, _ = select_bundle_packages(archive)
-                with archive.open(application) as stream, zipfile.ZipFile(
-                    stream
-                ) as inner:
+                with (
+                    archive.open(application) as stream,
+                    zipfile.ZipFile(stream) as inner,
+                ):
                     return package_manifest(zip_entries(inner))
             return package_manifest(zip_entries(archive))
     except (zipfile.BadZipFile, zipfile.LargeZipFile) as error:

@@ -11,10 +11,12 @@ import time
 import urllib.request
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Optional
+from typing import Callable, List, Optional
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
+
+from pyappxportable.console import ERR, notice
 
 CHECK_INTERVAL = 24 * 60 * 60
 PYPI_URL = "https://pypi.org/pypi/pyappxportable/json"
@@ -95,12 +97,12 @@ def write_cache(path: Path, data: dict) -> None:
                 pass
 
 
-def check_for_update() -> None:
-    """Print an upgrade command when appropriate; network failures stay silent."""
+def update_notice() -> Optional[str]:
+    """An upgrade command when one is due; network failures stay silent."""
     try:
         current = Version(installed_version())
         if current.local or current.is_devrelease or current.is_prerelease:
-            return
+            return None
         path, now = cache_path(), time.time()
         data = read_cache(path, now)
         if data is None:
@@ -117,10 +119,9 @@ def check_for_update() -> None:
                 write_cache(path, data)
         latest = data["latest"]
         if latest and Version(latest) > current:
-            print(
+            return (
                 f"pyappxportable {latest} is available (installed: {current}). "
-                "Update with: python -m pip install --upgrade pyappxportable",
-                file=sys.stderr,
+                "Update with: python -m pip install --upgrade pyappxportable"
             )
     except (
         OSError,
@@ -131,16 +132,31 @@ def check_for_update() -> None:
         http.client.HTTPException,
     ):
         pass
+    return None
 
 
-def start_update_check() -> None:
-    """Run in the background without delaying startup or keeping the CLI open."""
+def start_update_check() -> Callable[[float], None]:
+    """Check in the background without delaying startup. The check never prints
+    while the installer is asking something; call the returned function when the
+    installer is done to print the notice, waiting at most wait seconds for it."""
     if os.environ.get("PYAPPXPORTABLE_NO_UPDATE_CHECK", "").lower() in (
         "1",
         "true",
         "yes",
     ):
-        return
-    threading.Thread(
-        target=check_for_update, name="pyappxportable-update", daemon=True
-    ).start()
+        return lambda wait=0.0: None
+    notices: List[Optional[str]] = []
+    thread = threading.Thread(
+        target=lambda: notices.append(update_notice()),
+        name="pyappxportable-update",
+        daemon=True,
+    )
+    thread.start()
+
+    def report(wait: float = 1.0) -> None:
+        thread.join(wait)
+        if notices and notices[0]:
+            ERR.print()
+            notice(notices[0])
+
+    return report
