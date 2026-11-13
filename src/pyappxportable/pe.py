@@ -126,15 +126,42 @@ def native_host_application(game: Path, executable: Path) -> bool:
     return True
 
 
-def package_has_xaml(game: Path) -> bool:
-    """XAML pages: .xbf or Windows 8.0 source .xaml files, or .xbf names in
-    resources.pri. The shim makes the same check to run a native game on
-    Windows' XAML in an island instead of a CoreWindow."""
+XAML_APPLICATION = "Windows.UI.Xaml.Application".encode("utf-16-le")
+
+
+def code_starts_xaml(game: Path, executable: str) -> bool:
+    """XAML built in code, as Asphalt 8's WCPToolkit.dll does, ships no XAML
+    files, but the executable or a DLL it imports from the game folder names
+    the XAML Application class. Unity loads its player without importing it,
+    so its CoreWindow builds stay CoreWindow. The shim and its proxies name
+    XAML classes themselves and are skipped."""
+    own = {name.lower() for name in (*PROXIES, "XAudio2_9.dll", "appxportable.dll")}
+    folder = (Path(game) / executable).parent
+    pending, seen = [Path(executable).name.lower()], set()
+    while pending:
+        name = pending.pop()
+        local = folder / name
+        if name in own or name in seen or not local.is_file():
+            continue
+        seen.add(name)
+        if XAML_APPLICATION in local.read_bytes():
+            return True
+        pending.extend(pe_imports(local))
+    return False
+
+
+def package_has_xaml(game: Path, executable: str) -> bool:
+    """XAML: .xbf or Windows 8.0 source .xaml files, .xbf names in
+    resources.pri, or XAML built in code (see code_starts_xaml). The shim
+    makes the same check to run a native game on Windows' XAML in an island
+    instead of a CoreWindow."""
     if any(Path(game).rglob("*.xbf")) or any(Path(game).rglob("*.xaml")):
         return True
     pri = Path(game) / "resources.pri"
     data = pri.read_bytes() if pri.is_file() else b""
-    return b".xbf" in data or ".xbf".encode("utf-16-le") in data
+    if b".xbf" in data or ".xbf".encode("utf-16-le") in data:
+        return True
+    return code_starts_xaml(game, executable)
 
 
 # Real XAML runs native XAML games in an island, which Windows allows only in a

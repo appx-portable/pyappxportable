@@ -23,6 +23,9 @@ MANIFEST = """\
 """
 
 
+XAML_APPLICATION = "Windows.UI.Xaml.Application".encode("utf-16-le")
+
+
 def pe_image(imports=(), dll=False, marker=b"") -> bytes:
     """A minimal x86 PE image importing imports, its table inside the headers."""
     data = bytearray(0x400)
@@ -148,7 +151,30 @@ class RuntimeUpdateTests(unittest.TestCase):
         manifest = self.game / "Game.exe.manifest"
         self.assertIn('maxversiontested Id="10.0.18362.0"', manifest.read_text())
 
+    @unittest.skipUnless(sys.platform == "win32", "XAML Islands need Windows")
+    def test_code_only_xaml_game_gets_island_manifest(self):
+        # Asphalt 8 builds its XAML in code, in a DLL the game imports, and
+        # ships no XAML files.
+        (self.game / "Game.exe").write_bytes(
+            pe_image(["d3dcompiler_47.dll", "toolkit.dll"])
+        )
+        (self.game / "Toolkit.dll").write_bytes(
+            pe_image(dll=True, marker=XAML_APPLICATION)
+        )
+        self.update()
+        self.assertTrue((self.game / "Game.exe.manifest").is_file())
+
     def test_corewindow_game_gets_no_manifest(self):
+        self.update()
+        self.assertFalse((self.game / "Game.exe.manifest").exists())
+
+    def test_shim_naming_xaml_does_not_make_a_xaml_game(self):
+        # The game imports a proxy, which imports the shim; both name XAML
+        # classes themselves.
+        for name in ("appxportable.dll", *PROXIES):
+            (self.build / name).write_bytes(
+                pe_image(["appxportable.dll"], dll=True, marker=XAML_APPLICATION)
+            )
         self.update()
         self.assertFalse((self.game / "Game.exe.manifest").exists())
 
