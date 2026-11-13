@@ -91,13 +91,17 @@ class ComponentTests(unittest.TestCase):
             self.discover()
 
     def install(self, schema=3, generate=None, components_found=()):
-        with mock.patch.object(
-            components, "tool_archive", return_value=self.bundle(schema)
-        ), mock.patch.object(
-            components, "discover_components", return_value=list(components_found)
-        ), mock.patch.object(
-            components, "generate_projections", side_effect=generate
-        ) as generator:
+        with (
+            mock.patch.object(
+                components, "tool_archive", return_value=self.bundle(schema)
+            ),
+            mock.patch.object(
+                components, "discover_components", return_value=list(components_found)
+            ),
+            mock.patch.object(
+                components, "generate_projections", side_effect=generate
+            ) as generator,
+        ):
             components.install_managed_runtime(
                 self.game, Path("/wine"), build=Path("/build")
             )

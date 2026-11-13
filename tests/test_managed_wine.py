@@ -75,8 +75,9 @@ class ManagedWineRuntimeTests(unittest.TestCase):
                 self.archive if archive is None else archive,
             ]
         )
-        with mock.patch.object(macos, "fetch", fetch), mock.patch.object(
-            downloads, "fetch", fetch
+        with (
+            mock.patch.object(macos, "fetch", fetch),
+            mock.patch.object(downloads, "fetch", fetch),
         ):
             yield fetch
 
@@ -242,30 +243,27 @@ class ManagedWineInstallTests(unittest.TestCase):
             "stage_process_manifest": mock.DEFAULT,
         }
         output = io.StringIO()
-        with mock.patch.multiple(installer, **stubs) as patched, mock.patch.object(
-            installer, "extract_game", return_value=manifest
-        ), mock.patch.object(
-            installer, "architecture_of", return_value=architecture
-        ), mock.patch.object(
-            installer, "pe_info", return_value=SimpleNamespace(managed=managed)
-        ), mock.patch.object(
-            installer, "native_compiled_application", return_value=False
-        ), mock.patch.object(
-            installer, "native_host_application", return_value=False
-        ), mock.patch.object(
-            installer, "stage_dlls", return_value=tag
-        ), mock.patch.object(
-            installer.sys, "platform", system
-        ), mock.patch.object(
-            macos.platform, "machine", return_value=machine
-        ), mock.patch.dict(
-            os.environ, {"WINE": wine}
-        ), mock.patch.object(
-            installer,
-            "install_managed_wine",
-            return_value=self.selected if available else None,
-        ) as runtime, mock.patch(
-            "sys.stdout", output
+        with (
+            mock.patch.multiple(installer, **stubs) as patched,
+            mock.patch.object(installer, "extract_game", return_value=manifest),
+            mock.patch.object(installer, "architecture_of", return_value=architecture),
+            mock.patch.object(
+                installer, "pe_info", return_value=SimpleNamespace(managed=managed)
+            ),
+            mock.patch.object(
+                installer, "native_compiled_application", return_value=False
+            ),
+            mock.patch.object(installer, "native_host_application", return_value=False),
+            mock.patch.object(installer, "stage_dlls", return_value=tag),
+            mock.patch.object(installer.sys, "platform", system),
+            mock.patch.object(macos.platform, "machine", return_value=machine),
+            mock.patch.dict(os.environ, {"WINE": wine}),
+            mock.patch.object(
+                installer,
+                "install_managed_wine",
+                return_value=self.selected if available else None,
+            ) as runtime,
+            mock.patch("sys.stdout", output),
         ):
             patched["choose_package"].return_value = self.game
             patched["choose_folders"].return_value = (None, self.game, manifest)
@@ -333,16 +331,12 @@ class ManagedWineInstallTests(unittest.TestCase):
 class ManagedWineDependencyTests(unittest.TestCase):
     def test_owned_runtime_skips_standard_wine_but_checks_other_dependencies(self):
         output = io.StringIO()
-        with mock.patch.object(
-            macos, "needs_rosetta", return_value=True
-        ), mock.patch.object(
-            macos, "wine_installed", return_value=False
-        ), mock.patch.object(
-            macos, "install_wine_devel"
-        ) as wine, mock.patch.object(
-            macos, "GSTREAMER_FRAMEWORK"
-        ) as framework, mock.patch(
-            "sys.stdout", output
+        with (
+            mock.patch.object(macos, "needs_rosetta", return_value=True),
+            mock.patch.object(macos, "wine_installed", return_value=False),
+            mock.patch.object(macos, "install_wine_devel") as wine,
+            mock.patch.object(macos, "GSTREAMER_FRAMEWORK") as framework,
+            mock.patch("sys.stdout", output),
         ):
             framework.is_dir.return_value = False
             macos.add_macos_dependencies(InstallOptions(), input, wine_ready=True)

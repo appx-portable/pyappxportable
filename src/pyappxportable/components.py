@@ -259,11 +259,14 @@ def generate_projections(  # pylint: disable=too-many-locals
         try:
             # A Wine service can inherit a stdout pipe past the tool's exit.
             # A file lets us wait for the tool itself and retain its diagnostics.
-            with tempfile.TemporaryFile(
-                mode="w+", encoding="utf-8", errors="replace"
-            ) as log, tempfile.TemporaryFile(
-                mode="w+", encoding="utf-8", errors="replace"
-            ) as diagnostics:
+            with (
+                tempfile.TemporaryFile(
+                    mode="w+", encoding="utf-8", errors="replace"
+                ) as log,
+                tempfile.TemporaryFile(
+                    mode="w+", encoding="utf-8", errors="replace"
+                ) as diagnostics,
+            ):
                 result = subprocess.run(
                     [str(wine), *arguments],
                     cwd=work,
@@ -359,11 +362,10 @@ def install_managed_runtime(
         raise InstallError(
             f"Component projection directory must not be a symlink: {destination}"
         )
-    with tempfile.TemporaryDirectory(
-        prefix="appx-component-tools-"
-    ) as tools, tempfile.TemporaryDirectory(
-        prefix="appx-projections-", dir=game
-    ) as temporary:
+    with (
+        tempfile.TemporaryDirectory(prefix="appx-component-tools-") as tools,
+        tempfile.TemporaryDirectory(prefix="appx-projections-", dir=game) as temporary,
+    ):
         work, staged = Path(tools), Path(temporary)
         manifest = unpack_tools(tool_archive(tag, build), work)
         if manifest["schema"] < 3:
