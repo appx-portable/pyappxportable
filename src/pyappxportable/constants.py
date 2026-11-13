@@ -19,4 +19,4 @@ IDENTITY_NAME = re.compile(r"^(?=.*[A-Za-z0-9])[A-Za-z0-9.-]{3,50}$")
 INVALID_NAME = re.compile(r'[<>:"|?*\x00-\x1f]')
 
 PROXIES = ("d3dcompiler_47.dll", "XAudio2_8.dll", "DWrite.dll")
-REPOSITORY = "yell0wsuit/appx-portable"
+REPOSITORY = "appx-portable/appx-portable"

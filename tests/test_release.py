@@ -57,7 +57,7 @@ class ReleaseTests(unittest.TestCase):
                 "GITHUB_EVENT_PATH": str(event),
                 "GITHUB_OUTPUT": str(output),
                 "GITHUB_EVENT_NAME": "push",
-                "GITHUB_REPOSITORY": "yell0wsuit/pyappxportable",
+                "GITHUB_REPOSITORY": "appx-portable/pyappxportable",
             }
             with (
                 patch.dict(os.environ, environment),

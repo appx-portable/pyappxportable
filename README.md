@@ -1,10 +1,10 @@
 # pyappxportable
 
-Install Windows Store games as ordinary portable desktop games using [Appx Portable](https://github.com/yell0wsuit/appx-portable).
+Install Windows Store games as ordinary portable desktop games using [Appx Portable](https://github.com/appx-portable/appx-portable).
 
 Give the installer an `.appxbundle`, `.appx`, or extracted package folder. It extracts the game, downloads the matching Appx Portable runtime and required Microsoft framework packages, applies supported game patches, and writes a `00_click2startme` launcher. Updates preserve saves, settings, and logs.
 
-This package contains no games or Microsoft runtime files. Supply your own game packages. Runtime DLLs and game patches come from `yell0wsuit/appx-portable`; framework packages come from `yell0wsuit/vclibs-appx` with pinned SHA-256 checks.
+This package contains no games or Microsoft runtime files. Supply your own game packages. Runtime DLLs and game patches come from `appx-portable/appx-portable`; framework packages come from `appx-portable/vclibs-appx` with pinned SHA-256 checks.
 
 ## Install
 
@@ -64,7 +64,7 @@ Upgrade the installer with `python -m pip install --upgrade pyappxportable`. Run
 
 The CLI checks PyPI in the background at most once a day. When a newer compatible stable release is available, it prints an upgrade command after the installer finishes, never while a question is on screen. Checks never install updates or delay startup; offline failures stay silent. Use `--no-update-check` or set `PYAPPXPORTABLE_NO_UPDATE_CHECK=1` to disable them. `--help`, `--version`, and Python API calls do not check for updates. Use `pyappxportable --version` to show the installed package version.
 
-On macOS, the installer can set up Wine Devel, Rosetta 2, and GStreamer. Rosetta and GStreamer require administrator authorization; `--yes` prints instructions for those steps. See the [installer guide](https://github.com/yell0wsuit/appx-portable/blob/main/docs/installer.md) and [game compatibility](https://github.com/yell0wsuit/appx-portable/blob/main/docs/compatibility.md).
+On macOS, the installer can set up Wine Devel, Rosetta 2, and GStreamer. Rosetta and GStreamer require administrator authorization; `--yes` prints instructions for those steps. See the [installer guide](https://github.com/appx-portable/appx-portable/blob/main/docs/installer.md) and [game compatibility](https://github.com/appx-portable/appx-portable/blob/main/docs/compatibility.md).
 
 ## Python API
 
