@@ -201,6 +201,20 @@ class RuntimeUpdateTests(unittest.TestCase):
 
     def test_csharp_components_get_the_clr_bridge(self):
         self.with_components()
+        (self.build / "appx-components.dll").write_bytes(
+            pe_image(dll=True, marker=b"bridge")
+        )
+        (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"host"))
+        # Installed before the bridge was a DLL.
+        (self.game / "appx-host.exe").write_bytes(pe_image(marker=b"old"))
+        self.update_on("win32")
+        bridge = self.game / "appx-components.dll"
+        self.assertTrue(bridge.is_file() and bridge.read_bytes().endswith(b"bridge"))
+        self.assertFalse((self.game / "appx-host.exe").exists())
+
+    def test_csharp_components_use_an_older_runtimes_host(self):
+        # Runtimes before appx-components.dll carry the bridge in appx-host.exe.
+        self.with_components()
         (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"bridge"))
         self.update_on("win32")
         host = self.game / "appx-host.exe"
@@ -208,14 +222,16 @@ class RuntimeUpdateTests(unittest.TestCase):
 
     def test_csharp_components_without_bridge_in_runtime(self):
         self.with_components()
-        self.assertIn("no appx-host.exe", self.update_on("win32"))
-        self.assertFalse((self.game / "appx-host.exe").exists())
+        self.assertIn("no appx-components.dll", self.update_on("win32"))
+        self.assertFalse((self.game / "appx-components.dll").exists())
 
     def test_csharp_components_get_no_bridge_under_wine(self):
         self.with_components()
-        (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"bridge"))
-        self.assertNotIn("no appx-host.exe", self.update_on("linux"))
-        self.assertFalse((self.game / "appx-host.exe").exists())
+        (self.build / "appx-components.dll").write_bytes(
+            pe_image(dll=True, marker=b"bridge")
+        )
+        self.assertNotIn("no appx-components.dll", self.update_on("linux"))
+        self.assertFalse((self.game / "appx-components.dll").exists())
 
 
 COMPONENTS = """\

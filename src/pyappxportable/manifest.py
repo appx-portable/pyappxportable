@@ -22,7 +22,7 @@ class Manifest:
     dependencies: List[str]
     universal: bool = False  # a Windows 10 package: it names a TargetDeviceFamily
     # C# Windows Runtime components, which Windows serves through CLRHost.dll;
-    # the shim hosts them on the desktop CLR through appx-host.exe.
+    # the shim hosts them on the desktop CLR through appx-components.dll.
     clr_components: bool = False
 
 
