@@ -13,8 +13,7 @@ from pathlib import Path, PureWindowsPath
 from typing import List, Optional
 from xml.etree import ElementTree
 
-from pyappxportable.constants import REPOSITORY
-from pyappxportable.downloads import download_verified, fetch
+from pyappxportable.downloads import download_verified, release_sha256, release_url
 from pyappxportable.errors import InstallError
 from pyappxportable.manifest import local_name
 from pyappxportable.pe import pe_info
@@ -123,27 +122,12 @@ def tool_archive(tag: Optional[str], build: Optional[Path]) -> bytes:
         raise InstallError(
             f"Build is missing component projection tools: {TOOLS_ASSET}."
         )
-    try:
-        release = json.loads(
-            fetch(f"https://api.github.com/repos/{REPOSITORY}/releases/tags/{tag}")
-        )
-        asset = next(
-            (a for a in release.get("assets", []) if a["name"] == TOOLS_ASSET), None
-        )
-        if asset is None:
-            raise InstallError(
-                f"Release {tag} has no component projection tools ({TOOLS_ASSET})."
-            )
-        digest = asset.get("digest", "")
-        if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
-            raise InstallError(
-                "Component projection tools have no valid SHA-256 digest."
-            )
-        return download_verified(asset["browser_download_url"], digest[7:])
-    except (ValueError, KeyError, TypeError) as error:
+    sha256 = release_sha256(tag, TOOLS_ASSET)
+    if sha256 is None:
         raise InstallError(
-            f"Cannot read component projection tools for {tag}: {error}"
-        ) from error
+            f"Release {tag} has no component projection tools ({TOOLS_ASSET})."
+        )
+    return download_verified(release_url(tag, TOOLS_ASSET), sha256)
 
 
 def unpack_tools(data: bytes, destination: Path) -> dict:

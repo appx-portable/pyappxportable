@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from pyappxportable import components
+from pyappxportable import components, downloads
 from pyappxportable.errors import InstallError
 
 
@@ -246,24 +246,38 @@ class ComponentTests(unittest.TestCase):
             ["AppxPortable.WinRT.Interop.dll", "Example.dll", components.STAGED_RECORD],
         )
 
-    def test_bad_release_tool_digest_is_refused(self):
-        release = {
-            "assets": [
-                {
-                    "name": components.TOOLS_ASSET,
-                    "digest": "sha256:bad",
-                    "browser_download_url": "https://invalid/asset",
-                }
-            ]
-        }
-        with mock.patch.object(
-            components, "fetch", return_value=json.dumps(release).encode()
+    def test_release_tools_are_verified_against_published_checksum(self):
+        checksum = (hashlib.sha256(b"tools").hexdigest() + "  tools.zip\n").encode()
+        with (
+            mock.patch.object(
+                downloads, "release_asset", return_value=checksum
+            ) as published,
+            mock.patch.object(downloads, "fetch", return_value=b"tools") as fetch,
         ):
-            with self.assertRaisesRegex(InstallError, "digest"):
+            self.assertEqual(components.tool_archive("v-test", None), b"tools")
+        published.assert_called_once_with("v-test", components.TOOLS_ASSET + ".sha256")
+        self.assertEqual(
+            fetch.call_args.args[0],
+            "https://github.com/yell0wsuit/appx-portable/releases/download/"
+            f"v-test/{components.TOOLS_ASSET}",
+        )
+
+    def test_release_tools_with_wrong_digest_are_refused(self):
+        checksum = (hashlib.sha256(b"other").hexdigest() + "\n").encode()
+        with (
+            mock.patch.object(downloads, "release_asset", return_value=checksum),
+            mock.patch.object(downloads, "fetch", return_value=b"tools"),
+        ):
+            with self.assertRaisesRegex(InstallError, "SHA-256"):
+                components.tool_archive("v-test", None)
+
+    def test_bad_release_tool_checksum_is_refused(self):
+        with mock.patch.object(downloads, "release_asset", return_value=b"bad\n"):
+            with self.assertRaisesRegex(InstallError, "not a SHA-256 checksum"):
                 components.tool_archive("v-test", None)
 
     def test_missing_release_tool_is_actionable(self):
-        with mock.patch.object(components, "fetch", return_value=b'{"assets": []}'):
+        with mock.patch.object(downloads, "release_asset", return_value=None):
             with self.assertRaisesRegex(InstallError, "component projection tools"):
                 components.tool_archive("v-old", None)
 

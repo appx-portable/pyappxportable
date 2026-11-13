@@ -55,30 +55,28 @@ class ManagedWineRuntimeTests(unittest.TestCase):
                 ),
             ]
         )
-        self.asset = {
-            "name": "appx-portable-wine-clr-macos.tar.xz",
-            "browser_download_url": "https://example.invalid/managed-wine.tar.xz",
-            "digest": "sha256:" + hashlib.sha256(self.archive).hexdigest(),
-        }
+        self.checksum = (
+            hashlib.sha256(self.archive).hexdigest()
+            + "  appx-portable-wine-clr-macos.tar.xz\n"
+        ).encode()
         patch = mock.patch.object(macos, "WINE_CLR_ROOT", self.root, create=True)
         patch.start()
         self.addCleanup(patch.stop)
 
-    def release(self, asset=None):
-        return json.dumps({"assets": [self.asset if asset is None else asset]}).encode()
+    def published(self, checksum=None):
+        """release_asset serving the checksum beside the patched Wine archive."""
+        checksum = self.checksum if checksum is None else checksum
+
+        def release_asset(tag, name):
+            self.assertEqual((tag, name), ("v-test", macos.WINE_CLR_ASSET + ".sha256"))
+            return checksum
+
+        return mock.patch.object(downloads, "release_asset", side_effect=release_asset)
 
     @contextlib.contextmanager
-    def serve(self, asset=None, archive=None):
-        fetch = mock.Mock(
-            side_effect=[
-                self.release(asset),
-                self.archive if archive is None else archive,
-            ]
-        )
-        with (
-            mock.patch.object(macos, "fetch", fetch),
-            mock.patch.object(downloads, "fetch", fetch),
-        ):
+    def serve(self, checksum=None, archive=None):
+        fetch = mock.Mock(return_value=self.archive if archive is None else archive)
+        with self.published(checksum), mock.patch.object(downloads, "fetch", fetch):
             yield fetch
 
     def test_installs_verified_release_in_owned_directory(self):
@@ -95,31 +93,40 @@ class ManagedWineRuntimeTests(unittest.TestCase):
                 macos.install_managed_wine("v-test")
         self.assertFalse(any(self.root.glob("*/Wine Devel.app")))
 
-    def test_refuses_asset_without_digest(self):
-        asset = dict(self.asset)
-        asset.pop("digest")
-        with self.serve(asset=asset):
-            with self.assertRaises(InstallError):
+    def test_refuses_malformed_checksum(self):
+        with self.serve(checksum=b"not a checksum\n") as fetch:
+            with self.assertRaisesRegex(InstallError, "not a SHA-256 checksum"):
                 macos.install_managed_wine("v-test")
+        fetch.assert_not_called()
+
+    def test_downloads_from_direct_release_link(self):
+        with self.serve() as fetch:
+            macos.install_managed_wine("v-test")
+        url = fetch.call_args.args[0]
+        self.assertEqual(
+            url,
+            "https://github.com/yell0wsuit/appx-portable/releases/download/"
+            "v-test/appx-portable-wine-clr-macos.tar.xz",
+        )
 
     def test_reuses_verified_cache_without_downloading_archive(self):
         with self.serve():
             wine = macos.install_managed_wine("v-test")
-        with mock.patch.object(macos, "fetch", return_value=self.release()) as fetch:
+        with self.serve() as fetch:
             self.assertEqual(macos.install_managed_wine("v-test"), wine)
-            self.assertEqual(fetch.call_count, 1)
+        fetch.assert_not_called()
 
     def test_refuses_corrupt_cached_cpu(self):
         with self.serve():
             wine = macos.install_managed_wine("v-test")
         cpu = wine.parent.parent / "lib/wine/x86_64-windows/wow64cpu.dll"
         cpu.write_bytes(b"corrupt")
-        with mock.patch.object(macos, "fetch", return_value=self.release()):
+        with self.serve():
             with self.assertRaises(InstallError):
                 macos.install_managed_wine("v-test")
 
     def test_older_release_does_not_claim_patched_runtime(self):
-        with mock.patch.object(macos, "fetch", return_value=b'{"assets": []}'):
+        with mock.patch.object(downloads, "release_asset", return_value=None):
             self.assertIsNone(macos.install_managed_wine("v-old"))
 
 

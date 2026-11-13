@@ -3,6 +3,7 @@
 import hashlib
 import http.client
 import io
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -236,13 +237,30 @@ def resolve_release(tag: Optional[str]) -> str:
     return urllib.parse.unquote(path.rsplit("/releases/tag/", 1)[1])
 
 
+def release_url(tag: str, name: str) -> str:
+    """The direct link to the release asset name, which needs no GitHub API call."""
+    return f"{RELEASES}/download/{urllib.parse.quote(tag, safe='')}/{name}"
+
+
 def release_asset(tag: str, name: str) -> Optional[bytes]:
     """Download the release asset name from its direct link; None when the
     release does not have it."""
-    url = f"{RELEASES}/download/{urllib.parse.quote(tag, safe='')}/{name}"
+    url = release_url(tag, name)
     return retrying(
         url, BUILD_INSTEAD, lambda partial: read_url(url, partial), missing_ok=True
     )
+
+
+def release_sha256(tag: str, name: str) -> Optional[str]:
+    """The SHA-256 the release publishes beside the asset name, in name.sha256 as
+    sha256sum writes it; None when the release does not have it."""
+    published = release_asset(tag, name + ".sha256")
+    if published is None:
+        return None
+    fields = published.decode("ascii", "replace").split()
+    if not fields or not re.fullmatch(r"[0-9a-f]{64}", fields[0]):
+        raise InstallError(f"{name}.sha256 in release {tag} is not a SHA-256 checksum.")
+    return fields[0]
 
 
 def download_runtime(

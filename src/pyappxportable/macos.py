@@ -14,8 +14,12 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from pyappxportable.console import confirm, done, say, step, warn
-from pyappxportable.constants import REPOSITORY
-from pyappxportable.downloads import download_verified, fetch
+from pyappxportable.downloads import (
+    download_verified,
+    fetch,
+    release_sha256,
+    release_url,
+)
 from pyappxportable.errors import InstallError
 
 # macOS: what Wine needs
@@ -126,33 +130,13 @@ def check_managed_wine(folder: Path) -> Path:
 
 def install_managed_wine(tag: str) -> Optional[Path]:
     """Install this release's patched engine without replacing an existing Wine app."""
-    try:
-        release = json.loads(
-            fetch(f"https://api.github.com/repos/{REPOSITORY}/releases/tags/{tag}")
-        )
-        asset = next(
-            (
-                item
-                for item in release.get("assets", [])
-                if item["name"] == WINE_CLR_ASSET
-            ),
-            None,
-        )
-        if asset is None:
-            return None
-        digest = asset.get("digest", "")
-        if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
-            raise ValueError("patched Wine asset has no SHA-256 digest")
-        sha256 = digest.split(":", 1)[1]
-        url = asset["browser_download_url"]
-    except (ValueError, KeyError, TypeError) as error:
-        raise InstallError(
-            f"Could not read managed Wine runtime for {tag}: {error}"
-        ) from error
+    sha256 = release_sha256(tag, WINE_CLR_ASSET)
+    if sha256 is None:
+        return None
     destination = WINE_CLR_ROOT / sha256
     if destination.exists():
         return check_managed_wine(destination)
-    data = download_verified(url, sha256)
+    data = download_verified(release_url(tag, WINE_CLR_ASSET), sha256)
     WINE_CLR_ROOT.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=WINE_CLR_ROOT) as temporary:
         extract_tar_xz(data, Path(temporary))
