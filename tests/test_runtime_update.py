@@ -23,6 +23,9 @@ MANIFEST = """\
 """
 
 
+XAML_APPLICATION = "Windows.UI.Xaml.Application".encode("utf-16-le")
+
+
 def pe_image(imports=(), dll=False, marker=b"") -> bytes:
     """A minimal x86 PE image importing imports, its table inside the headers."""
     data = bytearray(0x400)
@@ -148,7 +151,30 @@ class RuntimeUpdateTests(unittest.TestCase):
         manifest = self.game / "Game.exe.manifest"
         self.assertIn('maxversiontested Id="10.0.18362.0"', manifest.read_text())
 
+    @unittest.skipUnless(sys.platform == "win32", "XAML Islands need Windows")
+    def test_code_only_xaml_game_gets_island_manifest(self):
+        # Asphalt 8 builds its XAML in code, in a DLL the game imports, and
+        # ships no XAML files.
+        (self.game / "Game.exe").write_bytes(
+            pe_image(["d3dcompiler_47.dll", "toolkit.dll"])
+        )
+        (self.game / "Toolkit.dll").write_bytes(
+            pe_image(dll=True, marker=XAML_APPLICATION)
+        )
+        self.update()
+        self.assertTrue((self.game / "Game.exe.manifest").is_file())
+
     def test_corewindow_game_gets_no_manifest(self):
+        self.update()
+        self.assertFalse((self.game / "Game.exe.manifest").exists())
+
+    def test_shim_naming_xaml_does_not_make_a_xaml_game(self):
+        # The game imports a proxy, which imports the shim; both name XAML
+        # classes themselves.
+        for name in ("appxportable.dll", *PROXIES):
+            (self.build / name).write_bytes(
+                pe_image(["appxportable.dll"], dll=True, marker=XAML_APPLICATION)
+            )
         self.update()
         self.assertFalse((self.game / "Game.exe.manifest").exists())
 
@@ -175,6 +201,20 @@ class RuntimeUpdateTests(unittest.TestCase):
 
     def test_csharp_components_get_the_clr_bridge(self):
         self.with_components()
+        (self.build / "appx-components.dll").write_bytes(
+            pe_image(dll=True, marker=b"bridge")
+        )
+        (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"host"))
+        # Installed before the bridge was a DLL.
+        (self.game / "appx-host.exe").write_bytes(pe_image(marker=b"old"))
+        self.update_on("win32")
+        bridge = self.game / "appx-components.dll"
+        self.assertTrue(bridge.is_file() and bridge.read_bytes().endswith(b"bridge"))
+        self.assertFalse((self.game / "appx-host.exe").exists())
+
+    def test_csharp_components_use_an_older_runtimes_host(self):
+        # Runtimes before appx-components.dll carry the bridge in appx-host.exe.
+        self.with_components()
         (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"bridge"))
         self.update_on("win32")
         host = self.game / "appx-host.exe"
@@ -182,14 +222,16 @@ class RuntimeUpdateTests(unittest.TestCase):
 
     def test_csharp_components_without_bridge_in_runtime(self):
         self.with_components()
-        self.assertIn("no appx-host.exe", self.update_on("win32"))
-        self.assertFalse((self.game / "appx-host.exe").exists())
+        self.assertIn("no appx-components.dll", self.update_on("win32"))
+        self.assertFalse((self.game / "appx-components.dll").exists())
 
     def test_csharp_components_get_no_bridge_under_wine(self):
         self.with_components()
-        (self.build / "appx-host.exe").write_bytes(pe_image(marker=b"bridge"))
-        self.assertNotIn("no appx-host.exe", self.update_on("linux"))
-        self.assertFalse((self.game / "appx-host.exe").exists())
+        (self.build / "appx-components.dll").write_bytes(
+            pe_image(dll=True, marker=b"bridge")
+        )
+        self.assertNotIn("no appx-components.dll", self.update_on("linux"))
+        self.assertFalse((self.game / "appx-components.dll").exists())
 
 
 COMPONENTS = """\

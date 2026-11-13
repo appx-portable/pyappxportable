@@ -93,6 +93,10 @@ jobs:
                 exclude:
                     - os: macos-latest
                       python: '3.9'
+                    # setup-python has no 3.9 for Ubuntu 26.04; Windows keeps
+                    # the oldest supported Python tested.
+                    - os: ubuntu-latest
+                      python: '3.9'
         runs-on: ${{ matrix.os }}
         env:
             PYAPPXPORTABLE_NO_UPDATE_CHECK: '1'

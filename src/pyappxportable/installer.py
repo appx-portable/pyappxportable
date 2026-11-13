@@ -240,7 +240,7 @@ def stage_process_manifest(game: Path, manifest: Manifest, hosting: Hosting) -> 
     # Wine has no XAML Islands.
     if sys.platform != "win32" or hosting.managed or hosting.native_compiled:
         return
-    if not package_has_xaml(game):
+    if not package_has_xaml(game, manifest.executable):
         return
     if (manifest.name, manifest.version) in PORTABLE_XAML:
         return

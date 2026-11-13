@@ -49,21 +49,36 @@ def check_wine_graphics(build: Path) -> None:
             )
 
 
+# The bridge the shim loads into the desktop CLR for a native game's C#
+# components.
+COMPONENT_BRIDGE = "appx-components.dll"
+
+
 def host_files(
     build: Path, managed: bool, wine: bool, native_host: bool, clr_components: bool
 ) -> List[str]:
-    """The host executables the game needs: the CLR host for a managed game or
-    for a native game's C# components, and the native host."""
+    """The host files the game needs: the CLR host for a managed game, the
+    component bridge for a native game's C# components, and the native host."""
     names = []
     if managed:
         names.append("appx-host.exe")
     elif clr_components and not wine:
-        # Releases before the component bridge have no use for it.
-        if (build / "appx-host.exe").is_file():
-            names.append("appx-host.exe")
+        # The bridge is a DLL the shim loads, so players have nothing to start
+        # by mistake. Runtimes before it carry the bridge in appx-host.exe, and
+        # releases before the bridge have neither.
+        bridge = next(
+            (
+                name
+                for name in (COMPONENT_BRIDGE, "appx-host.exe")
+                if (build / name).is_file()
+            ),
+            None,
+        )
+        if bridge:
+            names.append(bridge)
         else:
             note(
-                "this runtime has no appx-host.exe; the game's C# components"
+                f"this runtime has no {COMPONENT_BRIDGE}; the game's C# components"
                 " stay unavailable."
             )
     if native_host:
@@ -86,9 +101,9 @@ def stage_runtime(  # pylint: disable=too-many-arguments
 ) -> List[str]:
     """Copy the shim, proxies and the selected CLR or native host into game.
 
-    A native game with C# components also gets appx-host.exe, whose bridge the
-    shim calls to host them on the desktop CLR. Under Wine, a build's patched
-    graphics stack goes beside them too."""
+    A native game with C# components also gets appx-components.dll, the bridge
+    the shim calls to host them on the desktop CLR. Under Wine, a build's
+    patched graphics stack goes beside them too."""
     if managed and architecture == "x64":
         raise InstallError(
             "Managed x64 games are not supported; managed hosting is x86 only."
@@ -114,6 +129,11 @@ def stage_runtime(  # pylint: disable=too-many-arguments
         names.append(WINE_GRAPHICS_MANIFEST)
     for name in names:
         replace_file(build / name, game / name)
+    # A native game's bridge used to be appx-host.exe, which players could
+    # start by mistake; only managed games start from it.
+    leftover = Path(game) / "appx-host.exe"
+    if not managed and COMPONENT_BRIDGE in names and leftover.is_file():
+        leftover.unlink()
     # The WebView2 static loader's redistribution notice travels with the DLL.
     # Older releases/local builds do not have this dependency.
     notice = build / "WebView2-LICENSE.txt"
