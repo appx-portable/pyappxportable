@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
     version:
-        if: github.ref == 'refs/heads/main' && github.repository == 'yell0wsuit/pyappxportable'
+        if: github.ref == 'refs/heads/main' && github.repository == 'appx-portable/pyappxportable'
         runs-on: ubuntu-latest
         outputs:
             release: ${{ steps.version.outputs.release }}

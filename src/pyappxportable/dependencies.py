@@ -45,7 +45,7 @@ OPTIONAL_VCLIBS140 = (
     "vcamp140_app.dll",
     "vcomp140_app.dll",
 )
-VCLIBS_RELEASE = "https://github.com/yell0wsuit/vclibs-appx/releases/download/v1/"
+VCLIBS_RELEASE = "https://github.com/appx-portable/vclibs-appx/releases/download/v1/"
 # The Microsoft-signed package for each dependency and architecture in
 # VCLIBS_RELEASE, with its SHA-256 so a replaced release asset is refused.
 VCLIBS_PACKAGES = {
@@ -151,7 +151,7 @@ NATIVE_FRAMEWORKS = {
     "Microsoft.NET.Native.Framework.1.3": ("SharedLibrary.dll",),
     "Microsoft.NET.Native.Runtime.1.4": ("mrt100_app.dll", "clrcompression.dll"),
 }
-NATIVE_RELEASE = "https://github.com/yell0wsuit/vclibs-appx/releases/download/v2/"
+NATIVE_RELEASE = "https://github.com/appx-portable/vclibs-appx/releases/download/v2/"
 NATIVE_PACKAGES = {
     ("Microsoft.NET.Native.Framework.1.3", "x86"): (
         "Microsoft.NET.Native.Framework.1.3_1.3.24211.0_x86__8wekyb3d8bbwe.appx",

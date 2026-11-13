@@ -21,9 +21,9 @@ dependencies = ["packaging >= 20", "rich >= 15"]
 dev = ["build", "pylint", "twine", "black"]
 
 [project.urls]
-Homepage = "https://github.com/yell0wsuit/pyappxportable"
-Issues = "https://github.com/yell0wsuit/pyappxportable/issues"
-Runtime = "https://github.com/yell0wsuit/appx-portable"
+Homepage = "https://github.com/appx-portable/pyappxportable"
+Issues = "https://github.com/appx-portable/pyappxportable/issues"
+Runtime = "https://github.com/appx-portable/appx-portable"
 
 [project.scripts]
 pyappxportable = "pyappxportable.main:main"
