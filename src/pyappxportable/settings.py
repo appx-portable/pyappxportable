@@ -30,6 +30,10 @@ StubIap=0
 ; Most Store games run at the 60 frames a second they were made for; 0 removes
 ; the cap, which suits games that keep their speed at higher frame rates.
 FrameRate=60
+; Games run offline: they are told there is no internet connection, so they do
+; not wait on servers that have since closed. 1 gives the game Windows' own
+; connection status and HTTP.
+Network=0
 """
 STORE_CHOICES = {
     "none": (False, False),
